@@ -1,76 +1,20 @@
-#include <stdarg.h>
-#include <stdint.h>
 #include <stdlib.h>
 #include <stdio.h>
-
-typedef struct {
-  char* str;
-  uint64_t capacity;
-  uint64_t length;
-} String;
-
-#define WARN 0
-#define TERMINATE 1
-#define LOG 2
+#include <unistd.h>
+#include "../include/err.c"
+#include "../include/strings.h"
 
 #define DEBUG_ACTION WARN
 
-typedef enum {
-  SUCCESS,
-  INDEX_OUT_OF_BOUNDS,
-  MALLOC_FAILURE,
-  NULL_REFERENCE,
-  INVALID_SIZE,
-  ARITHMETIC_ERROR,
-} err_t;
-
 uint64_t str_len(const char* str) {
   uint64_t len = 0;
-  while (str[len] != 0) len++;
+  while (str[len] != '\0') len++;
   return len;
-}
-
-#define debug_raise_err(errcode, msg) raise_err(errcode, DEBUG_ACTION, __FILE__, __FUNCTION__, __LINE__, msg)
-void raise_err(err_t code, int action, const char* file_name, const char* fn, int line, const char* msg) {
-  if (code != SUCCESS) {
-    printf("\033[0;31m");
-    if (action == WARN) {
-      printf("WARNING!");
-    } else {
-      printf("ERRORO!");
-    }
-    printf("\033[0m %s :: %s() :: line %d\n", file_name, fn, line);
-  }
-  switch (code) {
-    case INDEX_OUT_OF_BOUNDS :
-      printf("You've tried to access an invalid index.\n");
-      break;
-    case MALLOC_FAILURE :
-      printf("memory allocation failure!\n");
-      break;
-    case SUCCESS : return;
-    case NULL_REFERENCE :
-      printf("Invalid pointer reference.\n");
-      break;
-    case INVALID_SIZE :
-      printf("you've tried to create an entity with 0 or negative size.\n");
-      break;
-    case ARITHMETIC_ERROR :
-      printf("An arithmetic error occured.\n");
-      break;
-  }
-  if (msg != NULL) {
-    printf("msg: %s\n", msg);
-  }
-  if (action == TERMINATE) {
-    printf("\033[0;31mPROGRAM TERMINAED \033[0m\n");
-    exit(EXIT_FAILURE);
-  }
 }
 
 String str_declare(uint64_t capacity) {
   if (capacity <= 0) {
-    debug_raise_err(INVALID_SIZE, "invalid string capacity");
+    debug_raise_err(INVALID_SIZE_ERR, "invalid string capacity");
     return (String) {NULL, 0, 0};
   }
   String s;
@@ -79,6 +23,7 @@ String str_declare(uint64_t capacity) {
   s.str = (char*)malloc(sizeof(char) * capacity);
   if (s.str == NULL) {
     debug_raise_err(MALLOC_FAILURE, NULL);
+    return (String) { .str = NULL, .capacity = 0, .length = 0 };
   }
   return s;
 }
@@ -96,7 +41,7 @@ char str_access(String str, int64_t index) {
   }
   if (index < 0 || index >= str.length) {
     printf("length: %lu index: %ld\n", str.length, index);
-    debug_raise_err(INDEX_OUT_OF_BOUNDS, NULL);
+    debug_raise_err(ADDRESS_BOUNDRY_ERR, NULL);
     return '\0';
   }
   return str.str[index];
@@ -107,7 +52,7 @@ int str_modify(String* str, int64_t index, char ch) {
     index = str->length + index;
   }
   if (index < 0 || index >= str->capacity) { 
-    debug_raise_err(INDEX_OUT_OF_BOUNDS, NULL);
+    debug_raise_err(ADDRESS_BOUNDRY_ERR, NULL);
     printf("access: %lu, capacity: %lu, length: %ld\n", str->capacity, str->length, index);
     return -1;
   }
@@ -126,7 +71,7 @@ int str_modify(String* str, int64_t index, char ch) {
 String str_dup(String s) {
   String dup = str_declare(s.capacity);
   if (dup.capacity == 0) {
-    debug_raise_err(NULL_REFERENCE, "failed to duplicate s");
+    debug_raise_err(NULL_REFERENCE, "failed to create duplicate");
     return dup;
   }
   dup.length = s.length;
@@ -140,7 +85,7 @@ const String str_slice(String s, int start, int end) {
   }
   if (start < 0 || end > s.length || start >= end) {
     printf("length: %lu, start: %d, end: %d\n", s.length, start, end);
-    debug_raise_err(INDEX_OUT_OF_BOUNDS, "incorrect slice length");
+    debug_raise_err(ADDRESS_BOUNDRY_ERR, "incorrect slice length");
     return (String) {NULL, 0, 0};
   }
   return (String) {
@@ -241,7 +186,7 @@ int64_t str_to_int64(const String s) {
     i++;
   }
   if (i != s.length){
-    debug_raise_err(ARITHMETIC_ERROR, "error converting to double: invalid character found.");
+    debug_raise_err(ARITHMETIC_ERR, "error converting to double: invalid character found.");
     print_invalid_number_err_msg(s, i);
     return 0.0;
   }
@@ -277,17 +222,16 @@ double str_to_double(const String s) {
   }
 
   if (i != s.length){
-    debug_raise_err(ARITHMETIC_ERROR, "error converting to double: invalid character found.");
+    debug_raise_err(ARITHMETIC_ERR, "error converting to double: invalid character found.");
     print_invalid_number_err_msg(s, i);
     return 0.0;
   }
   return result * sign;
 }
 
-#define str_replace_first_using_str(src_ptr, start, search_key_str, replace_str) (str_replace_first(src_ptr, start, search_key_str.str, search_key_str.length, replace_str.str, replace_str.length))
 int str_replace_first(String* s, int start, const char* search_key, uint32_t key_length, const char* replace_with, uint32_t val_length) {
   if (start < 0) {
-    debug_raise_err(INDEX_OUT_OF_BOUNDS, "invalid start index");    
+    debug_raise_err(ADDRESS_BOUNDRY_ERR, "invalid start index");    
     return -1;
   }
 
@@ -320,7 +264,7 @@ int str_replace_first(String* s, int start, const char* search_key, uint32_t key
   } else if (diff < 0) {
     diff *= -1;
     if (s->length + diff > s->capacity) {
-      s->str = realloc(s->str, sizeof(char) * (s->capacity + diff));
+      s->str = realloc(s->str, sizeof(char) * (s->capacity + diff) + 1);
       if (s->str == NULL) {
         debug_raise_err(MALLOC_FAILURE, "failed to reallocate memory for replacement");
         return start;
@@ -341,7 +285,6 @@ int str_replace_first(String* s, int start, const char* search_key, uint32_t key
     return span_start + val_length - 1;
 }
 
-#define str_replace_all_using_str(src_ptr, start, search_key_str, replace_str) (str_replace_first(src_ptr, start, search_key_str.str, search_key_str.length, replace_str.str, replace_str.length))
 void str_replace_all(String* s, const char* search_key, uint32_t key_length, const char* replace_with, uint32_t val_length) {
   int pos = 0;
   while ((pos = str_replace_first(s, pos, search_key, key_length, replace_with, val_length)) != -1);
@@ -352,21 +295,4 @@ void str_free(String* s) {
   s->length = 0;
   free(s->str);
   s->str = NULL;
-}
-
-// io
-
-int main() {
-  String a = str_init("roses are rose");
-  printf("length: %lu, capacity: %lu, str: %s\n", a.length, a.capacity, a.str);
-  char key[] = "rose";
-  char val[] = "orange";
-  str_replace_all(&a,  key, str_len(key), val, str_len(val));
-  printf("length: %lu, capacity: %lu, str: ", a.length, a.capacity);
-  for (int i = 0; i < a.length; i++) {
-    printf("%c", str_access(a, i));
-  }
-  printf("\n");
-  str_free(&a);
-  return 0;
 }
