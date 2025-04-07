@@ -20,6 +20,14 @@ Reference materials: https://m.youtube.com/watch?v=ZisNZcQn6fo&pp=ygULYXJlbmEgYW
 #include <stdlib.h>
 #include <stdint.h>
 
+#define ARENA_16 16
+#define ARENA_32 32
+#define ARENA_64 64
+#define ARENA_128 128
+#define ARENA_256 256
+#define ARENA_512 512
+#define ARENA_1024 1024
+
 typedef struct Arena {
   uint64_t capacity; // holds total capacity of the chunk.
   uint64_t buf_size; // total used size in the chunk.

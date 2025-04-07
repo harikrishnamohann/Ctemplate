@@ -1,10 +1,21 @@
+#ifndef _STRINGS_H_
+#define _STRINGS_H_
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
-#include "../include/err.c"
-#include "../include/strings.h"
+#include <stdint.h>
+#include <stdarg.h>
 
+#include "err.c"
 #define DEBUG_ACTION WARN
+
+typedef struct {
+  char* str;
+  uint64_t capacity;
+  uint64_t length;
+} String;
+
 
 uint64_t str_len(const char* str) {
   uint64_t len = 0;
@@ -104,15 +115,31 @@ String str_join(String a, String b) {
   return result;
 }
 
-int str_concat(String *dest, const String *src) {
-  dest->capacity += src->capacity;
+int str_concat(String *dest, const String src) {
+  dest->capacity += src.capacity;
   dest->str  = realloc(dest->str, sizeof(char) * dest->capacity);
   if(dest->str == NULL) {
     debug_raise_err(MALLOC_FAILURE, NULL);
     return -1;
   }
-  for (int i = dest->length, j = 0; j < src->length; i++, j++) dest->str[i] = src->str[j];
-  dest->length += src->length;
+  for (int i = dest->length, j = 0; j < src.length; i++, j++) dest->str[i] = src.str[j];
+  dest->length += src.length;
+  return 0;
+}
+
+int str_copy(String *dest, const String src) {
+  if (dest->capacity < src.length) {
+    dest->capacity += src.length - dest->capacity;
+    dest->str = realloc(dest->str, dest->capacity + 1);
+    if (dest->str == NULL) {
+      debug_raise_err(MALLOC_FAILURE, "realloc() failed.");
+      return -1;
+    }
+  }
+  for (int i = 0; i < src.length; i++) {
+    dest->str[i] = src.str[i];
+  }
+  dest->length = src.length;
   return 0;
 }
 
@@ -296,3 +323,5 @@ void str_free(String* s) {
   free(s->str);
   s->str = NULL;
 }
+
+#endif
