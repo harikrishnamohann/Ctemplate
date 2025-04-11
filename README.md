@@ -1,7 +1,3 @@
-Here’s a structured and polished version of your README that keeps your original voice and intent intact, while making it clearer and easier to follow:
-
----
-
 # CTemplate  
 > _~ A minimal template for simple C projects_
 
