@@ -8,9 +8,13 @@
 #define TERMINATE 1
 #define LOG 2
 
+#define PROCEED 0
+#define RECONSIDER -1
+#define HALT -2
+
 typedef enum {
-  ADDRESS_BOUNDRY_ERR,
-  MALLOC_FAILURE,
+  INDEX_OUT_OF_BOUNDS = 1,
+  MALLOC_FAILURE, // terminating point
   NULL_REFERENCE,
   INVALID_SIZE_ERR,
   ARITHMETIC_ERR,
@@ -19,6 +23,7 @@ typedef enum {
 #define debug_raise_err(errcode, msg) raise_err(errcode, DEBUG_ACTION, __FILE__, __FUNCTION__, __LINE__, msg)
 
 void raise_err(err_t code, int action, const char* file_name, const char* fn, int line, const char* msg) {
+  if (code == PROCEED) return;
   printf("\033[0;31m");
   if (action == WARN) {
     printf("WARNING!");
@@ -27,12 +32,12 @@ void raise_err(err_t code, int action, const char* file_name, const char* fn, in
   }
   printf("\033[0m %s :: %s() :: line %d\n", file_name, fn, line);
   switch (code) {
-    case ADDRESS_BOUNDRY_ERR :
-      printf("You've tried to access an invalid index.\n");
+    case INDEX_OUT_OF_BOUNDS :
+      printf("You've tried to access an out of bound index.\n");
       break;
     case MALLOC_FAILURE :
       printf("memory allocation failure!\n");
-      break;
+      exit(EXIT_FAILURE);
     case NULL_REFERENCE :
       printf("Invalid pointer reference.\n");
       break;
