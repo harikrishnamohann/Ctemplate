@@ -1,39 +1,83 @@
-# CTemplate
-> _~ A template for simple C projects_
+Here’s a structured and polished version of your README that keeps your original voice and intent intact, while making it clearer and easier to follow:
 
-This is a simple directory structure that I use for my C projects. It encourages the use of a unity build system. It offers an implementation of String type, An arena allocator and some error handling mechanisms that I use personally. I am adding new things to the structure when a need arise. So this is not a template that offers api's for all sort of things.
+---
 
-Here is the directory structure or template structure
+# CTemplate  
+> _~ A minimal template for simple C projects_
+
+**CTemplate** is a lightweight project structure designed to help organize small-to-medium C programs. It encourages the use of a **unity build system** and includes a few personal utility libraries:
+
+- A simple `String` type implementation  
+- An `Arena` allocator  
+- Basic error handling mechanisms
+
+This isn't an all-in-one C framework, but rather a personal toolkit that grows as needed.
+
+---
+
+## 📁 Project Structure
+
 ```
 Ctemplate/
-├── lib :::::::::::::::: home for all second level api's
-│   ├── arena.c
-│   ├── err.c
-│   └── strings.c
-├── makefile ::::::::::: for compiling to target/
-├── README.md
-├── src :::::::::::::::: contains project files
-│   └── main.c
-└── target ::::::::::::: executable lives here
+├── lib/               # Home for second-level APIs (libraries)
+│   ├── arena.c        # Arena memory allocator
+│   ├── err.c          # Error handling macros
+│   └── strings.c      # String type and manipulation functions
+├── makefile           # Compiles the project into the /target directory
+├── README.md          # This file
+├── src/               # Your project files go here
+│   └── main.c
+└── target/            # Compiled binaries live here
     └── debug
 ```
 
-For using this template in your project, **clone** this repo and **rename** it to your project name.
-```
+---
+
+## 🚀 Getting Started
+
+To use this template for your project:
+
+```bash
 git clone https://github.com/harikrishnamohann/Ctemplate.git
-mv Ctemplate <your project name>
+mv Ctemplate <your-project-name>
 ```
 
-Oh and also don't forget to **remove git repository** by removing the `.git` folder
+Then, remove the Git history:
 
-For **using** any of the **library** in the lib/ folder, you just have to include it in the src/main.c file. For example, 
+```bash
+rm -rf <your-project-name>/.git
+```
+
+You're now ready to start coding!
+
+---
+
+## 🧠 How to Use the Libraries
+
+To use any library from `lib/`, just include it in your `main.c` (or any other C file):
+
 ```c
 #include "../lib/strings.c"
+
 int main() {
-	String key = str_init("hello world");
-	return 0;
+    String s = str_init("hello world");
+    return 0;
 }
 ```
-A **How to use** section is defined at the top of each library file. You can refer that to learn how to use those libraries.
 
-Thank you for taking a look at my silly stuffs. That's all `^-^`
+Each library has a **"How to use"** or **API manual** section at the top of the file. Refer to it for a quick overview of available functions and usage examples.
+
+---
+
+## 📌 Notes
+
+- This template assumes a **unity build** — all source files are directly included in your entry point (e.g., `main.c`).
+- Memory management is manual. Libraries like `strings.c` and `arena.c` allocate memory that **you must free**.
+- You’re encouraged to extend or modify the template as per your needs.
+
+---
+
+## 💬 Final Words
+
+Thanks for checking out my silly stuff!  
+Hope you find it helpful or fun to explore. `^-^`
