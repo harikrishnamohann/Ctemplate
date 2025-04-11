@@ -14,16 +14,26 @@ Ctemplate/
 ├── README.md
 ├── src :::::::::::::::: contains project files
 │   └── main.c
-└── target	:::::::::::: executable lives here
+└── target ::::::::::::: executable lives here
     └── debug
 ```
 
-For using this template in your project, clone this repo and rename it to your project name.
+For using this template in your project, **clone** this repo and **rename** it to your project name.
 ```
 git clone https://github.com/harikrishnamohann/Ctemplate.git
 mv Ctemplate <your project name>
 ```
 
-Oh and also don't forget to remove the git history by removing the `.git` folder
+Oh and also don't forget to **remove git repository** by removing the `.git` folder
+
+For **using** any of the **library** in the lib/ folder, you just have to include it in the src/main.c file. For example, 
+```c
+#include "../lib/strings.c"
+int main() {
+	String key = str_init("hello world");
+	return 0;
+}
+```
+A **How to use** section is defined at the top of each library file. You can refer that to learn how to use those libraries.
 
 Thank you for taking a look at my silly stuffs. That's all `^-^`

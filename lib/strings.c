@@ -1,3 +1,78 @@
+/* 
+This is a custom string library designed to simulate
+dynamic string behavior in C. It supports a variety
+of string operations including initialization, modification,
+slicing, joining, comparison, replacement, and type conversions.
+
+This implementation depends on `debug_raise_err()` for error
+reporting (defined in "err.c"). Memory for dynamic strings must 
+be explicitly freed by the user using `str_free()`.
+
+Author: Harikrishna Mohan
+Date: April-11-2025
+
+## HOW TO USE ##
+String str_declare(uint64_t capacity)
+  -- Initializes an empty string with a specified capacity.
+     Caller must free it using str_free().
+
+String str_init(const char* s)
+  -- Initializes a String from a C-style string.
+
+char str_access(String str, int64_t index)
+  -- Safely access a character using positive or negative index.
+
+int str_modify(String* str, int64_t index, char ch)
+  -- Modify character at given index. Adjusts length if needed.
+
+String str_dup(String s)
+  -- Returns a deep copy of the string. Caller must free it.
+
+const String str_slice(String s, int start, int end)
+  -- Returns a slice (view) of the string. No new memory allocated.
+
+String str_join(String a, String b)
+  -- Returns a new string as a concatenation of a and b.
+     Must be freed by caller.
+
+int str_concat(String *dest, const String src)
+  -- Appends src to dest. Resizes buffer if needed.
+
+int str_copy(String *dest, const String src)
+  -- Overwrites dest with contents of src.
+
+int str_cmp(const String a, const String b)
+  -- Lexicographical comparison: 0 if equal, positive if a > b.
+
+String str_compose(const char* fmt, ...)
+  -- Like sprintf, returns a formatted String. Caller must free.
+
+int str_contains(const String src, const String key)
+  -- Returns the index of the first match of key in src or RECONSIDER.
+
+int64_t str_to_int64(const String s)
+  -- Parses and converts the string into a 64-bit integer.
+
+double str_to_double(const String s)
+  -- Parses and converts the string into a double.
+
+int str_replace_first(String* s, int start, const char* search_key, uint32_t key_length, const char* target, uint32_t target_length)
+  -- Replaces first occurrence of `search_key` starting at index `start`.
+
+void str_replace_all(String* s, const char* search_key, uint32_t key_length, const char* replace_with, uint32_t val_length)
+  -- Replaces all occurrences of `search_key` with `replace_with`.
+
+void str_free(String* s)
+  -- Frees memory allocated by any String constructor or mutator.
+
+Macro APIs:
+str_replace_first_using_str(str_ptr, start, key_str, target_str)
+  -- Shorthand for str_replace_first() using String types.
+
+str_replace_all_using_str(str_ptr, key_str, target_str)
+  -- Shorthand for str_replace_all() using String types.
+*/
+
 #ifndef _STRINGS_H_
 #define _STRINGS_H_
 
