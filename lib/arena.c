@@ -34,8 +34,7 @@ void arena_free(Arena *arena)
 Reference materials: https://m.youtube.com/watch?v=ZisNZcQn6fo&pp=ygULYXJlbmEgYWxsb2M%3D
 */
 
-#ifndef _ARENA
-#define _ARENA
+#pragma once
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -143,5 +142,3 @@ void arena_free(Arena *arena) {
     current = next;
   }
 }
-
-#endif

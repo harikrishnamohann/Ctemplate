@@ -1,16 +1,22 @@
 CC = gcc
-CFLAGS =  
+CFLAGS = -std=c23 -Wall -Werror
 DEBUG = debug
+RELEASE = release
 
 all: target target/$(DEBUG)
+
+release: target/$(RELEASE)
 
 # Run target
 run: target target/$(DEBUG)
 	./target/$(DEBUG)
 
-# Unity build
+
+target/$(RELEASE): src/main.c
+	$(CC) -o3 $(CFLAGS) $^ -o $@
+
 target/$(DEBUG): src/main.c
-	$(CC) $^ -o $@ $(CFLAGS)
+	$(CC) -g $^ -o $@ $(CFLAGS)
 
 # directory check
 target:

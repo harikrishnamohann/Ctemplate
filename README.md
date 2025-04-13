@@ -38,10 +38,11 @@ git clone https://github.com/harikrishnamohann/Ctemplate.git
 mv Ctemplate <your-project-name>
 ```
 
-Then, remove the Git history:
+Then, remove the Git history and this README.md file:
 
 ```bash
 rm -rf <your-project-name>/.git
+rm <your-project-name>/README.md
 ```
 
 You're now ready to start coding!

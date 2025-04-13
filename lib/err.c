@@ -1,5 +1,4 @@
-#ifndef ERR_HANDLE
-#define ERR_HANDLE
+#pragma once
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -56,5 +55,3 @@ void raise_err(err_t code, int action, const char* file_name, const char* fn, in
     exit(EXIT_FAILURE);
   }
 }
-
-#endif

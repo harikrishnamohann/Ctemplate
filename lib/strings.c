@@ -73,8 +73,7 @@ str_replace_all_using_str(str_ptr, key_str, target_str)
   -- Shorthand for str_replace_all() using String types.
 */
 
-#ifndef _STRINGS_H_
-#define _STRINGS_H_
+#pragma once
 
 #include <malloc.h>
 #include <stdio.h>
@@ -296,7 +295,7 @@ static void print_invalid_number_err_msg(const String s, int i) {
 // character.
 int64_t str_to_int64(const String s) {
   int8_t sign = 1;
-  int i = 0, n = 1;
+  int i = 0;
   int64_t result = 0;
   if (s.length == 0) return 0;
 
@@ -431,5 +430,3 @@ void str_free(String* s) {
   free(s->str);
   s->str = NULL;
 }
-
-#endif
