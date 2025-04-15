@@ -18,6 +18,8 @@ typedef enum {
   INVALID_SIZE_ERR,
   ARITHMETIC_ERR,
   RESIZE_ERR,
+  FILE_NOT_FOUND,
+  IO_ERR,
 } err_t;
 
 #define debug_raise_err(errcode, msg) raise_err(errcode, DEBUG_ACTION, __FILE__, __FUNCTION__, __LINE__, msg)
@@ -32,6 +34,12 @@ void raise_err(err_t code, int action, const char* file_name, const char* fn, in
   }
   printf("\033[0m %s :: %s() :: line %d\n", file_name, fn, line);
   switch (code) {
+    case IO_ERR :
+      printf("Input/Output failure\n");
+      break;
+    case FILE_NOT_FOUND :
+      printf("File does not exist.\n");
+      break;
     case INDEX_OUT_OF_BOUNDS :
       printf("You've tried to access an out of bound index.\n");
       break;

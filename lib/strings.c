@@ -1,39 +1,34 @@
 /* 
   This is a custom string library that I designed to simulate
   dynamic string behavior. It uses a length variable to keep
-  track of the end of string; instead of null-terminating,
+  track of the end of string instead of null-terminating,
   A capacity to indicate string boundry and a scalable flag
-  to create resizable string types.
+  to augment resizable array behaviour.
 
-  There are two type of strings.
-    1. scalable
-      You can resize the size of the array
+  Scalability: 
+    There are two type of strings.
+    1. scalable :
+      String using array-list. you can use the str_insert() and
+      str_remove() function to insert and remove characters from String.
       you can declare a scalable string by passing SCALABLE macro
       as parameter to str_declare() function
         example: String s = str_declare(SCALABLE);
 
-    2. non scalable
-      Once you declare it, you won't be able to resize the string,
-      unless you set explicitly set s.scalable = true
+    2. non-scalable :
+      It's just a regular array. To create one, 
+      you just have to specify the array size on declaration.
+        example: String buffer = str_declare(128);
 
-  It relays on `debug_raise_err()` (defined in "err.c") for
-  error reporting.
-  Memory allocated for strings must be explicitly freed by the
-  user using `str_free()`.
-
-  Scalability:
-    - Some functions dynamically grow string buffers if the `scalable` 
-      flag is set.
-    - Non-scalable strings will trigger an error if resizing is required.
-
-  Author: Harikrishna Mohan  
-  Date: April-11-2025
+  Most of the functions relays on `debug_raise_err()` (defined in "err.c")
+  for error reporting and returns status codes defined in err.c (usually...).
+  Memory allocated for strings must be explicitly freed from where
+  the allocating function is called using `str_free()`.
 
   ## HOW TO USE ##
 
   String str_declare(uint64_t capacity)
     -- Initializes an empty string with the specified capacity.
-       If capacity == STR_DYNAMIC, it enables automatic scaling.
+       If capacity == SCALABLE, it enables automatic scaling.
        Caller must free it using str_free().
 
   String str_init(const char* s)
@@ -90,6 +85,15 @@
   void str_replace_all(String* str, const char* key, uint32_t key_len, const char* replace_with, uint32_t val_len)
     -- Replaces all occurrences of `key` with `replace_with`.
 
+  String str_read_file(char* filename)
+    -- Reads given file and return it as a non-scalable string.
+       Returns an empty string on error.
+       The user should free the returnd string after use.
+
+  int str_write_to_file(char* filename, const String s)
+    -- Writes given string to filename.
+    -- Returns PROCEED on success.
+
   void str_free(String* str)
     -- Frees the memory allocated for the string and resets metadata.
 
@@ -103,6 +107,9 @@
 
   str_contains_using_str(src_str, key_str)
     -- Macro version of str_contains() using String types.
+
+Author: Harikrishna Mohan  
+Date: April-11-2025
 */
 
 #pragma once
@@ -131,6 +138,9 @@ uint64_t str_len(const char* str) {
   return len;
 }
 
+// Initializes an empty string with the specified capacity.
+// If capacity == SCALABLE, it enables automatic scaling.
+// Caller must free it using str_free().
 String str_declare(uint64_t capacity) {
   if (capacity < 0) {
     debug_raise_err(INVALID_SIZE_ERR, "invalid string capacity");
@@ -229,7 +239,7 @@ String str_dup(String s) {
   return dup;
 }
 
-// Returns a *view* (non-owning reference) into a non-scalable substring.
+// Returns a view (non-owning reference) into a non-scalable substring.
 // No memory is allocated. Useful for efficient slicing.
 const String str_slice(String s, int start, int end) {
   if (end < 0) {
@@ -483,6 +493,48 @@ int str_replace_first(String* s, int start, const char* search_key, uint32_t key
 void str_replace_all(String* s, const char* search_key, uint32_t key_length, const char* replace_with, uint32_t val_length) {
   int pos = 0;
   while ((pos = str_replace_first(s, pos, search_key, key_length, replace_with, val_length)) != -1);
+}
+
+// Reads given file and return it as a non-scalable string.
+// Returns an empty string on error.
+// The user should free the returnd string after use.
+String str_read_from_file(char* filename) {
+  FILE *file = fopen(filename, "r");
+  if (file == NULL) {
+    debug_raise_err(FILE_NOT_FOUND, filename);
+    goto err_ret;
+  }
+
+  int ch;
+  String str = str_declare(SCALABLE);
+  while ((ch = fgetc(file)) != EOF) {
+    if (str_insert(&str, -1, ch) != PROCEED) goto err_ret;
+  }
+
+  fclose(file);
+  str.scalable = false;
+  return str;
+  err_ret:
+  return (String){NULL, 0, 0, 0};
+}
+
+// Writes given string to filename.
+// Returns PROCEED on success.
+int str_write_to_file(char* filename, const String s) {
+  FILE *file = fopen(filename, "w");
+  if (file == NULL) {
+    debug_raise_err(FILE_NOT_FOUND, filename);
+    return HALT;
+  }
+
+  size_t bytes_written = fwrite(s.str, sizeof(char), s.length, file);
+  if (bytes_written < s.length) {
+    debug_raise_err(IO_ERR, filename);
+    return RECONSIDER;
+  }
+
+  fclose(file);
+  return PROCEED;
 }
 
 // Frees the memory allocated for the string and resets metadata.
