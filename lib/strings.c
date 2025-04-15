@@ -124,6 +124,8 @@ Date: April-11-2025
 #define DEBUG_ACTION WARN
 
 #define SCALABLE 0
+#define STR_BEGIN 0
+#define STR_END -1
 
 typedef struct {
   char* str;
