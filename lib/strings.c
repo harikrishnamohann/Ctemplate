@@ -495,48 +495,6 @@ void str_replace_all(String* s, const char* search_key, uint32_t key_length, con
   while ((pos = str_replace_first(s, pos, search_key, key_length, replace_with, val_length)) != -1);
 }
 
-// Reads given file and return it as a non-scalable string.
-// Returns an empty string on error.
-// The user should free the returnd string after use.
-String str_read_from_file(char* filename) {
-  FILE *file = fopen(filename, "r");
-  if (file == NULL) {
-    debug_raise_err(FILE_NOT_FOUND, filename);
-    goto err_ret;
-  }
-
-  int ch;
-  String str = str_declare(SCALABLE);
-  while ((ch = fgetc(file)) != EOF) {
-    if (str_insert(&str, -1, ch) != PROCEED) goto err_ret;
-  }
-
-  fclose(file);
-  str.scalable = false;
-  return str;
-  err_ret:
-  return (String){NULL, 0, 0, 0};
-}
-
-// Writes given string to filename.
-// Returns PROCEED on success.
-int str_write_to_file(char* filename, const String s) {
-  FILE *file = fopen(filename, "w");
-  if (file == NULL) {
-    debug_raise_err(FILE_NOT_FOUND, filename);
-    return HALT;
-  }
-
-  size_t bytes_written = fwrite(s.str, sizeof(char), s.length, file);
-  if (bytes_written < s.length) {
-    debug_raise_err(IO_ERR, filename);
-    return RECONSIDER;
-  }
-
-  fclose(file);
-  return PROCEED;
-}
-
 // Frees the memory allocated for the string and resets metadata.
 void str_free(String* s) {
   s->capacity = 0;
