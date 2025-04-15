@@ -1,110 +1,148 @@
 /* 
-This is a custom string library designed to simulate
-dynamic string behavior in C. It supports a variety
-of string operations including initialization, modification,
-slicing, joining, comparison, replacement, and type conversions.
+  This is a custom string library that I designed to simulate
+  dynamic string behavior. It uses a length variable to keep
+  track of the end of string; instead of null-terminating,
+  A capacity to indicate string boundry and a scalable flag
+  to create resizable string types.
 
-This implementation depends on `debug_raise_err()` for error
-reporting (defined in "err.c"). Memory for dynamic strings must 
-be explicitly freed by the user using `str_free()`.
+  There are two type of strings.
+    1. scalable
+      You can resize the size of the array
+      you can declare a scalable string by passing SCALABLE macro
+      as parameter to str_declare() function
+        example: String s = str_declare(SCALABLE);
 
-Author: Harikrishna Mohan
-Date: April-11-2025
+    2. non scalable
+      Once you declare it, you won't be able to resize the string,
+      unless you set explicitly set s.scalable = true
 
-## HOW TO USE ##
-String str_declare(uint64_t capacity)
-  -- Initializes an empty string with a specified capacity.
-     Caller must free it using str_free().
+  It relays on `debug_raise_err()` (defined in "err.c") for
+  error reporting.
+  Memory allocated for strings must be explicitly freed by the
+  user using `str_free()`.
 
-String str_init(const char* s)
-  -- Initializes a String from a C-style string.
+  Scalability:
+    - Some functions dynamically grow string buffers if the `scalable` 
+      flag is set.
+    - Non-scalable strings will trigger an error if resizing is required.
 
-char str_access(String str, int64_t index)
-  -- Safely access a character using positive or negative index.
+  Author: Harikrishna Mohan  
+  Date: April-11-2025
 
-int str_modify(String* str, int64_t index, char ch)
-  -- Modify character at given index. Adjusts length if needed.
+  ## HOW TO USE ##
 
-String str_dup(String s)
-  -- Returns a deep copy of the string. Caller must free it.
+  String str_declare(uint64_t capacity)
+    -- Initializes an empty string with the specified capacity.
+       If capacity == STR_DYNAMIC, it enables automatic scaling.
+       Caller must free it using str_free().
 
-const String str_slice(String s, int start, int end)
-  -- Returns a slice (view) of the string. No new memory allocated.
+  String str_init(const char* s)
+    -- Initializes a String from a null-terminated C string.
 
-String str_join(String a, String b)
-  -- Returns a new string as a concatenation of a and b.
-     Must be freed by caller.
+  int str_insert(String* str, int64_t index, char ch)
+    -- Inserts a character at the specified index (supports negative indexing).
+       Resizes the buffer if the string is scalable.
 
-int str_concat(String *dest, const String src)
-  -- Appends src to dest. Resizes buffer if needed.
+  char str_remove(String* str, int64_t index)
+    -- Removes and returns the character at the specified index.
+       Supports negative indexing.
 
-int str_copy(String *dest, const String src)
-  -- Overwrites dest with contents of src.
+  String str_dup(String str)
+    -- Returns a deep copy of the given string. Caller must free it.
 
-int str_cmp(const String a, const String b)
-  -- Lexicographical comparison: 0 if equal, positive if a > b.
+  const String str_slice(String str, int start, int end)
+    -- Returns a *view* (non-owning reference) into a non-scalable substring.
+       No memory is allocated. Useful for efficient slicing.
 
-String str_compose(const char* fmt, ...)
-  -- Like sprintf, returns a formatted String. Caller must free.
+  String str_join(String a, String b)
+    -- Returns a new string by concatenating `a` and `b`.
+       The resultant is scalable if either a or b is scalable.
+       Caller must free the memory allocated for return value.
 
-int str_contains(const String src, const String key)
-  -- Returns the index of the first match of key in src or RECONSIDER.
+  int str_concat(String* dest, const String src)
+    -- Appends `src` to `dest`. Requires `dest` to be scalable.
 
-int64_t str_to_int64(const String s)
-  -- Parses and converts the string into a 64-bit integer.
+  int str_copy(String* dest, const String src)
+    -- Replaces contents of `dest` with `src`. Resizes if needed.
+       Requires `dest` to be scalable.
 
-double str_to_double(const String s)
-  -- Parses and converts the string into a double.
+  int str_cmp(const String a, const String b)
+    -- Lexicographical comparison: 
+       returns 0 if equal, >0 if a > b, <0 if a < b.
 
-int str_replace_first(String* s, int start, const char* search_key, uint32_t key_length, const char* target, uint32_t target_length)
-  -- Replaces first occurrence of `search_key` starting at index `start`.
+  String str_compose(const char* fmt, ...)
+    -- Returns a non-scalable formatted String (like sprintf).
+       Caller must free.
 
-void str_replace_all(String* s, const char* search_key, uint32_t key_length, const char* replace_with, uint32_t val_length)
-  -- Replaces all occurrences of `search_key` with `replace_with`.
+  int64_t str_contains(const String src, const char* key, uint64_t key_len)
+    -- Returns the index of the first occurrence of `key` in `src`, or RECONSIDER.
 
-void str_free(String* s)
-  -- Frees memory allocated by any String constructor or mutator.
+  int64_t str_to_int64(const String s)
+    -- Converts the string to int64_t. Returns RECONSIDER if invalid input.
 
-Macro APIs:
-str_replace_first_using_str(str_ptr, start, key_str, target_str)
-  -- Shorthand for str_replace_first() using String types.
+  double str_to_double(const String s)
+    -- Converts the string to a double. Returns RECONSIDER on failure.
 
-str_replace_all_using_str(str_ptr, key_str, target_str)
-  -- Shorthand for str_replace_all() using String types.
+  int str_replace_first(String* str, int start, const char* key, uint32_t key_len, const char* target, uint32_t target_len)
+    -- Replaces the first occurrence of `key` (after `start`) with `target`.
+       Resizes if necessary. Requires str to be scalable.
+
+  void str_replace_all(String* str, const char* key, uint32_t key_len, const char* replace_with, uint32_t val_len)
+    -- Replaces all occurrences of `key` with `replace_with`.
+
+  void str_free(String* str)
+    -- Frees the memory allocated for the string and resets metadata.
+
+  ## MACROS ##
+
+  str_replace_first_using_str(str_ptr, start, key_str, target_str)
+    -- Macro version of str_replace_first() using String types.
+
+  str_replace_all_using_str(str_ptr, key_str, target_str)
+    -- Macro version of str_replace_all() using String types.
+
+  str_contains_using_str(src_str, key_str)
+    -- Macro version of str_contains() using String types.
 */
 
 #pragma once
 
 #include <malloc.h>
 #include <stdio.h>
-#include <unistd.h>
 #include <stdint.h>
 #include <stdarg.h>
+#include <stdbool.h>
 
 #include "err.c"
 #define DEBUG_ACTION WARN
+
+#define SCALABLE 0
 
 typedef struct {
   char* str;
   uint64_t capacity;
   uint64_t length;
+  bool scalable;
 } String;
 
-// returns the length of null terminated char*.
 uint64_t str_len(const char* str) {
   uint64_t len = 0;
   while (str[len] != '\0') len++;
   return len;
 }
 
-// create an empty string with given capacity.
-// memory must be freed using str_free()
 String str_declare(uint64_t capacity) {
-  if (capacity <= 0) {
-    debug_raise_err(HALT, "invalid string capacity");
+  if (capacity < 0) {
+    debug_raise_err(INVALID_SIZE_ERR, "invalid string capacity");
   }
   String s;
   s.length = 0;
+  if (capacity == SCALABLE) {
+    capacity = 1;
+    s.scalable = true;
+  } else {
+    s.scalable = false;
+  }
   s.capacity = capacity;
   s.str = (char*)malloc(sizeof(char) * capacity);
   if (s.str == NULL) {
@@ -113,7 +151,7 @@ String str_declare(uint64_t capacity) {
   return s;
 }
 
-// create a new string using char* with its length as capacity.
+// Initializes a String from a null-terminated C string.
 String str_init(const char* s) {
   String str = str_declare(str_len(s));
   str.length = str.capacity;
@@ -121,42 +159,64 @@ String str_init(const char* s) {
   return str;
 }
 
-// access character at a specified position from both positive
-// and negative indices with boundry checking.
-// return RECONSIDER if out of bound index is given.
-char str_access(String str, int64_t index) {
-  if (index < 0) {
-    index = str.length + index;
+// Inserts a character at the specified index (supports negative indexing).
+// Resizes the string exponentially if the string is scalable.
+ int str_insert(String* s, int64_t pos, char ch) {
+  // validate pos
+  if (pos < 0) { // for negative index access
+    pos = s->length + pos + 1;
   }
-  if (index < 0 || index >= str.length) {
-    printf("length: %lu index: %ld\n", str.length, index);
-    debug_raise_err(INDEX_OUT_OF_BOUNDS, NULL);
+  if (pos > s->length || pos < 0) { // check for invalid pos
+    debug_raise_err(INDEX_OUT_OF_BOUNDS, "invalid access positon");
     return RECONSIDER;
   }
-  return str.str[index];
-}
+  // deal with string capacity
+  if (s->length >= s->capacity) { // string is full
+    if (s->scalable) { // reallocate if the user want an arraylist
+      s->str = realloc(s->str, s->capacity * 2);
+      if (s->str == NULL) {
+        debug_raise_err(MALLOC_FAILURE, "failed to resize string.");
+      }
+      s->capacity *= 2;
+    } else { // not possible to add more characters
+      debug_raise_err(INDEX_OUT_OF_BOUNDS, "str is not scalable");
+      return RECONSIDER;
+    }
+  }
+  // assign ch to required pos
+  for (int64_t i = s->length - 1; i >= pos; i--) {
+    s->str[i + 1] = s->str[i];
+  }  
 
-// alter character at a specified position using negative or
-// positive indices. return PROCEED on success and RECONSIDER on
-// index out of bounds failure.
-int str_modify(String* str, int64_t index, char ch) {
-  if (index < 0) {
-    index = str->length + index;
-  }
-  if (index < 0 || index >= str->capacity) { 
-    debug_raise_err(INDEX_OUT_OF_BOUNDS, NULL);
-    printf("access: %lu, capacity: %lu, length: %ld\n", index, str->capacity, str->length);
-    return RECONSIDER;
-  }
-  if (index >= str->length) {
-    str->length = index + 1;
-  }
-  str->str[index] = ch;
+  s->str[pos] = ch;
+  s->length++;
   return PROCEED;
 }
 
-// create duplicate of the given string,
-// user of this function is deligated to free the memory.
+// Removes and returns the character at the specified index.
+// Supports negative indexing.
+char str_remove(String* s, int64_t pos) {
+  if (s->length <= 0) {
+    debug_raise_err(INDEX_OUT_OF_BOUNDS, "cannot remove from an empty string.");
+    return RECONSIDER;
+  }
+  if (pos < 0) { // normalize index
+    pos = s->length + pos;
+  }
+  if (pos > s->length || pos < 0) { // check for invalid pos
+    debug_raise_err(INDEX_OUT_OF_BOUNDS, "invalid access positon");
+    return RECONSIDER;
+  }
+
+  char ch = s->str[pos];
+  s->length--;
+  for (int64_t i = pos; i < s->length; i++) {
+    s->str[i] = s->str[i + 1];
+  }
+  return ch;
+}
+
+// Returns a deep copy of the given string. Caller must free it.
 String str_dup(String s) {
   String dup = str_declare(s.capacity);
   if (dup.capacity == 0) {
@@ -164,14 +224,13 @@ String str_dup(String s) {
     return dup;
   }
   dup.length = s.length;
+  dup.scalable = s.scalable;
   for (int i = 0; i < s.length; i++) dup.str[i] = s.str[i];
   return dup;
 }
 
-// slices string 's' from start to end - 1 (excluding end index).
-// no memory is allocated. it returns a reference of the original
-// string with str pointing to the start index and length is
-// set to end - start.
+// Returns a *view* (non-owning reference) into a non-scalable substring.
+// No memory is allocated. Useful for efficient slicing.
 const String str_slice(String s, int start, int end) {
   if (end < 0) {
     end = s.length + end + 1;
@@ -185,35 +244,46 @@ const String str_slice(String s, int start, int end) {
     .length = end - start,
     .str = s.str + start,
     .capacity = s.capacity,
+    .scalable = false,
   }; 
 }
 
-// join string a and string b and return a new string
-// memory must be freed after use using str_free()
+// Returns a new string by concatenating `a` and `b`.
+// The resultant is scalable if either a or b is scalable.
+// Caller must free the memory allocated for return value.
 String str_join(String a, String b) {
   String result = str_declare(a.capacity + b.capacity); 
   result.length = a.length + b.length;
+  result.scalable = a.scalable || b.scalable;
   int j = 0;
   for (int i = 0; i < a.length; i++, j++) result.str[j] = a.str[i];
   for (int i = 0; i < b.length; i++, j++) result.str[j] = b.str[i];
   return result;
 }
 
-// concatinate src to dest
+// Appends `src` to `dest`. Requires `dest` to be scalable.
 int str_concat(String *dest, const String src) {
+  if (!dest->scalable) {
+    debug_raise_err(RESIZE_ERR, "dest is not resizeable"); 
+    return HALT;
+  }
   dest->capacity += src.capacity;
   dest->str  = realloc(dest->str, sizeof(char) * dest->capacity);
   if(dest->str == NULL) {
     debug_raise_err(MALLOC_FAILURE, NULL);
-    return -1;
   }
   for (int i = dest->length, j = 0; j < src.length; i++, j++) dest->str[i] = src.str[j];
   dest->length += src.length;
   return 0;
 }
 
-// copy src to dest
+// Replaces contents of `dest` with `src`. Resizes if needed.
+// Requires `dest` to be scalable.
 int str_copy(String *dest, const String src) {
+  if (!dest->scalable) {
+    debug_raise_err(RESIZE_ERR, "dest is not resizeable"); 
+    return HALT;
+  }
   if (dest->capacity < src.length) {
     dest->capacity += src.length - dest->capacity;
     dest->str = realloc(dest->str, dest->capacity + 1);
@@ -229,20 +299,17 @@ int str_copy(String *dest, const String src) {
   return 0;
 }
 
-// lexically compares two strings
-// returns 0 if both strings are same; positive if a > b,
-// negative otherwise
+// Lexicographical comparison: 
+// returns 0 if equal, >0 if a > b, <0 if a < b.
 int str_cmp(const String a, const String b) {
-  int64_t diff = 0, i = 0;
-  for (; i < a.length && i < b.length; i++) diff += a.str[i] - b.str[i];
-  for (; i < a.length; i++) diff += a.str[i];
-  for (; i < b.length; i++) diff -= b.str[i];
-  return diff;
+  for (int i = 0; i < a.length && i < b.length; i++) {
+    if (a.str[i] != b.str[i]) return a.str[i] - b.str[i];
+  }
+  return a.length - b.length;
 }
 
-// this encapuslate the snprintf() function.
-// it takes a formated string and its arguments as input and
-// returns the composed string. Memory should be freed after use.
+// Returns a non-scalable formatted String (like sprintf).
+// Caller must free.
 String str_compose(const char* fmt, ...) {
     va_list args;
     va_start(args, fmt);
@@ -263,19 +330,19 @@ String str_compose(const char* fmt, ...) {
     return composed;
 }
 
-// returns the starting index of key if key is present in src.
-// otherwise returns RECONSIDER
-int str_contains(const String src, const String key) {
+// Returns the index of the first occurrence of `key` in `src`, or RECONSIDER.
+int64_t str_contains(const String src, const char* key, uint64_t key_len) {
   int pos;
   for (int i = 0; i < src.length; i++) {
-    for (pos = 0; pos < key.length && src.str[i + pos] == key.str[pos]; pos++);
-    if (pos == key.length) {
+    for (pos = 0; pos < key_len && src.str[i + pos] == key[pos]; pos++);
+    if (pos == key_len) {
       return i;
     }
   }
   return RECONSIDER;
 }
 
+// Converts the string to int64_t. Returns RECONSIDER if invalid input.
 static void print_invalid_number_err_msg(const String s, int i) {
     for (int j = 0; j < s.length; j++) {
       if (j == i) {
@@ -289,10 +356,7 @@ static void print_invalid_number_err_msg(const String s, int i) {
     printf("^ invalid character found.\n");
 }
 
-// convert the given string to int64_t
-// returns converted number on success
-// returns RECONSIDER on if given string contains a non-numeric
-// character.
+// Converts the string to a double. Returns RECONSIDER on failure.
 int64_t str_to_int64(const String s) {
   int8_t sign = 1;
   int i = 0;
@@ -317,9 +381,7 @@ int64_t str_to_int64(const String s) {
   return result * sign;
 }
 
-// convert given string to double
-// returns converted number on success.
-// returns RECONSIDER if a non-numeric character is found.
+// converts string to double
 double str_to_double(const String s) {
   double result = 0.0;
   int8_t sign = 1;
@@ -354,12 +416,15 @@ double str_to_double(const String s) {
   }
   return result * sign;
 }
-// Replaces the first occurrence of a search_key with a replacement
-// string, starting from a specified position
-// returns ending position of replaced target in string s.
-// returns RECONSIDER if search_key is not found or an invalid
-// start index is given.
-int str_replace_first(String* s, int start, const char* search_key, uint32_t key_length, const char* target, uint32_t target_length) {
+
+// Replaces the first occurrence of `key` (after `start`) with `target`.
+// Resizes if necessary.
+// Requires str to be scalable.
+int str_replace_first(String* s, int start, const char* search_key, uint32_t key_len, const char* target, uint32_t target_len) {
+  if (!s->scalable) {
+    debug_raise_err(RESIZE_ERR, "dest is not resizeable"); 
+    return HALT;
+  }
   if (start < 0 || start >= s->length) {
     debug_raise_err(INDEX_OUT_OF_BOUNDS, "invalid start index");    
     return RECONSIDER;
@@ -368,8 +433,8 @@ int str_replace_first(String* s, int start, const char* search_key, uint32_t key
   uint32_t span_start; // to store begin index of key in s
   int8_t contains = 0;
   for (int i = start; i < s->length; i++) {
-    for (span_start = 0; span_start < key_length && s->str[i + span_start] == search_key[span_start]; span_start++);
-    if (span_start == key_length) {
+    for (span_start = 0; span_start < key_len && s->str[i + span_start] == search_key[span_start]; span_start++);
+    if (span_start == key_len) {
       span_start = i;
       contains = 1;
       break;
@@ -380,15 +445,15 @@ int str_replace_first(String* s, int start, const char* search_key, uint32_t key
     return RECONSIDER;
   }
 
-  if (str_cmp((String){(char*)search_key, key_length, key_length}, (String){(char*)target, target_length, target_length}) == 0) {
+  if (str_cmp((String){(char*)search_key, key_len, key_len}, (String){(char*)target, target_len, target_len}) == 0) {
     goto ret; // no need of replacement if key and value are same. just return.
   }
 
-  uint32_t span_end = span_start + key_length - 1;
-  int32_t diff = key_length - target_length;
+  uint32_t span_end = span_start + key_len - 1;
+  int32_t diff = key_len - target_len;
   if (diff > 0) { // target string is shorter than search_key
     s->length -= diff;
-    for (int j = span_start + target_length; j < s->length; j++) {
+    for (int j = span_start + target_len; j < s->length; j++) {
       s->str[j] = s->str[j + diff]; // shift characters to the left
     }
   } else if (diff < 0) { // target string is longer than search_key
@@ -406,27 +471,36 @@ int str_replace_first(String* s, int start, const char* search_key, uint32_t key
     }
   }
 
-  for (int i = span_start, j = 0; j < target_length; i++, j++) {
+  for (int i = span_start, j = 0; j < target_len; i++, j++) {
     s->str[i] = target[j];
   }
 
   ret:
-    return span_start + target_length - 1;
+    return span_start + target_len - 1;
 }
 
-// macro for giving string type inputs for str_replace_first()
-#define str_replace_first_using_str(str_ptr, start, key_str, target_str) \
-  str_replace_first(str_ptr, start, key_str.str, key_str.length, target_str.str, target_str.length)
-
-#define str_replace_all_using_str(str_ptr, key_str, target_str) str_replace_all(str_ptr, key_str.str, key_str.length, target_str.str, target_str.length)
+// Replaces all occurrences of `key` with `replace_with`.
 void str_replace_all(String* s, const char* search_key, uint32_t key_length, const char* replace_with, uint32_t val_length) {
   int pos = 0;
   while ((pos = str_replace_first(s, pos, search_key, key_length, replace_with, val_length)) != -1);
 }
 
+// Frees the memory allocated for the string and resets metadata.
 void str_free(String* s) {
   s->capacity = 0;
   s->length = 0;
   free(s->str);
   s->str = NULL;
 }
+
+// Macro version of str_replace_first() using String types.
+#define str_replace_first_using_str(str_ptr, start, key_str, target_str) \
+  str_replace_first(str_ptr, start, key_str.str, key_str.length, target_str.str, target_str.length)
+
+// Macro version of str_replace_all() using String types.
+#define str_replace_all_using_str(str_ptr, key_str, target_str) \
+  str_replace_all(str_ptr, key_str.str, key_str.length, target_str.str, target_str.length)
+
+// Macro version of str_contains() using String types.
+#define str_contains_using_str(src_str, key_str) \
+  (str_contains(src_str, key_str.str, key_str.length))

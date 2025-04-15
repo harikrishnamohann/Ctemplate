@@ -17,6 +17,7 @@ typedef enum {
   NULL_REFERENCE,
   INVALID_SIZE_ERR,
   ARITHMETIC_ERR,
+  RESIZE_ERR,
 } err_t;
 
 #define debug_raise_err(errcode, msg) raise_err(errcode, DEBUG_ACTION, __FILE__, __FUNCTION__, __LINE__, msg)
@@ -45,6 +46,9 @@ void raise_err(err_t code, int action, const char* file_name, const char* fn, in
       break;
     case ARITHMETIC_ERR :
       printf("An arithmetic error occured.\n");
+      break;
+    case RESIZE_ERR :
+      printf("you tried to resize a non-resizeable reference.\n");
       break;
   }
   if (msg != NULL) {
