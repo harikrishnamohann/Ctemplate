@@ -49,6 +49,12 @@
     -- Returns a *view* (non-owning reference) into a non-scalable substring.
        No memory is allocated. Useful for efficient slicing.
 
+  String str_owned_slice(String* s, uint64_t start, uint64_t end)
+    -- Returns an owning reference into a non-scalable String.
+       The Returned slice will be removed from original string.
+       No memory is allocated.
+       you can either pass the slice or the original string into str_free() once.
+
   String str_join(String a, String b)
     -- Returns a new string by concatenating `a` and `b`.
        The resultant is scalable if either a or b is scalable.
@@ -132,6 +138,7 @@ typedef struct {
   uint64_t capacity;
   uint64_t length;
   bool scalable;
+  int64_t offset;
 } String;
 
 uint64_t str_len(const char* str) {
@@ -149,6 +156,7 @@ String str_declare(uint64_t capacity) {
   }
   String s;
   s.length = 0;
+  s.offset = 0;
   if (capacity == SCALABLE) {
     capacity = 1;
     s.scalable = true;
@@ -243,21 +251,55 @@ String str_dup(String s) {
 
 // Returns a view (non-owning reference) into a non-scalable substring.
 // No memory is allocated. Useful for efficient slicing.
-const String str_slice(String s, int start, int end) {
-  if (end < 0) {
-    end = s.length + end + 1;
-  }
-  if (start < 0 || end > s.length || start >= end) {
-    printf("length: %lu, start: %d, end: %d\n", s.length, start, end);
+// you can either pass the slice or the original string into free once.
+String str_slice(const String* s, uint64_t start, uint64_t end) {
+  if (end > s->length || start >= end) {
+    printf("length: %lu, start: %lu, end: %lu\n", s->length, start, end);
     debug_raise_err(INDEX_OUT_OF_BOUNDS, "incorrect slice length");
     return (String) {NULL, 0, 0};
   }
   return (String) {
     .length = end - start,
-    .str = s.str + start,
-    .capacity = s.capacity,
+    .str = s->str + start,
+    .capacity = s->capacity,
     .scalable = false,
+    .offset = s->str - s->str + start,
   }; 
+}
+
+// Returns an owned reference into a non-scalable String.
+// The Returned slice will be removed from original string.
+// No memory is allocated.
+// you can either pass the slice or the original string into str_free() once.
+String str_consume_slice(String* s, uint64_t start, uint64_t end) {
+  if (end > s->length || start >= end) {
+    printf("length: %lu, start: %lu, end: %lu\n", s->length, start, end);
+    debug_raise_err(INDEX_OUT_OF_BOUNDS, "incorrect slice length");
+    return (String) {NULL, 0, 0};
+  }
+
+  String slice = {
+    .str = s->str,
+    .length = end - start,
+    .capacity = end - start,
+    .offset = s->offset,
+    .scalable = false
+  };
+
+  int tmp;
+  for (int i = 0; i < slice.length; i++) {
+    tmp = slice.str[start + i];
+    for (int j = start + i; j > i; j--) {
+      slice.str[j] = slice.str[j - 1];
+    }
+    slice.str[i] = tmp;
+  }
+
+  s->offset = s->offset + slice.length;
+  s->str = s->str + slice.length;
+  s->length = s->length - slice.length;
+  
+  return slice;
 }
 
 // Returns a new string by concatenating `a` and `b`.
@@ -501,7 +543,8 @@ void str_replace_all(String* s, const char* search_key, uint32_t key_length, con
 void str_free(String* s) {
   s->capacity = 0;
   s->length = 0;
-  free(s->str);
+  free(s->str - s->offset);
+  s->offset = 0;
   s->str = NULL;
 }
 
