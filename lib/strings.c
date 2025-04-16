@@ -42,6 +42,12 @@
     -- Removes and returns the character at the specified index.
        Supports negative indexing.
 
+  void str_offset(String* s, int64_t offset);
+    -- Moves the pointer to a relative position based on specified offset.
+
+  void str_rewind(String* s)
+    -- rewinds offseted string back to 0
+
   String str_dup(String str)
     -- Returns a deep copy of the given string. Caller must free it.
 
@@ -236,6 +242,24 @@ char str_remove(String* s, int64_t pos) {
   return ch;
 }
 
+// Moves the pointer to a relative position based on specified offset.
+void str_offset(String* s, int64_t offset) {
+  if (offset > (signed)s->length || offset * -1 > (signed)s->offset) {
+    debug_raise_err(INDEX_OUT_OF_BOUNDS, "invalid offset");
+    return;
+  }
+  s->length -= offset;
+  s->offset += offset;
+  s->str += offset;
+}
+
+// rewinds offseted string back to 0
+void str_rewind(String* s) {
+  s->length += s->offset;
+  s->str -= s->offset;
+  s->offset = 0;
+}
+
 // Returns a deep copy of the given string. Caller must free it.
 String str_dup(String s) {
   String dup = str_declare(s.capacity);
@@ -271,7 +295,7 @@ String str_slice(const String* s, uint64_t start, uint64_t end) {
 // The Returned slice will be removed from original string.
 // No memory is allocated.
 // you can either pass the slice or the original string into str_free() once.
-String str_consume_slice(String* s, uint64_t start, uint64_t end) {
+String str_owned_slice(String* s, uint64_t start, uint64_t end) {
   if (end > s->length || start >= end) {
     printf("length: %lu, start: %lu, end: %lu\n", s->length, start, end);
     debug_raise_err(INDEX_OUT_OF_BOUNDS, "incorrect slice length");
@@ -286,19 +310,15 @@ String str_consume_slice(String* s, uint64_t start, uint64_t end) {
     .scalable = false
   };
 
-  int tmp;
   for (int i = 0; i < slice.length; i++) {
-    tmp = slice.str[start + i];
+    char tmp = slice.str[start + i];
     for (int j = start + i; j > i; j--) {
       slice.str[j] = slice.str[j - 1];
     }
     slice.str[i] = tmp;
   }
 
-  s->offset = s->offset + slice.length;
-  s->str = s->str + slice.length;
-  s->length = s->length - slice.length;
-  
+  str_offset(s, slice.length);
   return slice;
 }
 
