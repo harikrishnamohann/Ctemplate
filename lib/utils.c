@@ -31,6 +31,6 @@ void str_to_file(char* filename, String content) {
   fclose(fp);
 }
 
-inline bool is_whitespace(char ch) { return (ch == ' ') || ch == '\t' || ch =='\r' || ch == '\v'; }
-inline bool is_digit(char ch) { return (ch >= '0' && ch <= '9'); }
-inline bool is_end_of_line(char ch) { return (ch == '\n' || ch == '\0'); }
+bool is_whitespace(char ch) { return (ch == ' ') || ch == '\t' || ch =='\r' || ch == '\v'; }
+bool is_digit(char ch) { return (ch >= '0' && ch <= '9'); }
+bool is_end_of_line(char ch) { return (ch == '\n' || ch == '\0'); }
