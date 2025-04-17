@@ -23,6 +23,9 @@
  * must be released by calling str_free(). 
  **************************************************************************
  *
+ * Modify this library as per the requirements. For instance, if you wanna use
+ * an arena allocator for handling memory, you want may edit the methods that 
+ * calls malloc() and realloc().
  *
  * ## Function Reference ##
  *
@@ -173,6 +176,14 @@ uint64_t str_len(const char* str) {
   return len;
 }
 
+void _str_scale(String* s, float scale_factor) {
+  s->str = realloc(s->str, (uint64_t)(s->capacity * scale_factor));
+  if (s->str == NULL) {
+    debug_raise_err(MALLOC_FAILURE, "Failed to scale string!");
+  }
+  s->capacity *= scale_factor;
+}
+
 // Initializes an empty string with the specified capacity.
 // If capacity == SCALABLE, it enables automatic scaling.
 // Caller must free it using str_free().
@@ -203,14 +214,6 @@ String str_init(const char* s) {
   str.length = str.capacity;
   for (int i = 0; i < str.length; i++) str.str[i] = s[i];
   return str;
-}
-
-void _str_scale(String* s, float scale_factor) {
-  s->str = realloc(s->str, (uint64_t)(s->capacity * scale_factor));
-  if (s->str == NULL) {
-    debug_raise_err(MALLOC_FAILURE, "Failed to scale string!");
-  }
-  s->capacity *= scale_factor;
 }
 
 // Inserts a character at the specified index (supports negative indexing).
