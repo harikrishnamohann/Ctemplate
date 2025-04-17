@@ -47,7 +47,7 @@
  *
  * ### String Manipulation ###
  *
- * String str_dup(String str)
+ * String str_dup(const String* s)
  * Returns a deep copy of the given string. The caller is responsible for freeing the memory.
  *
  * String str_join(String a, String b)
@@ -111,6 +111,9 @@
  * double str_to_double(const String s)
  * Converts the string `s` to a `double`.
  * Returns RECONSIDER on failure (e.g., invalid input).
+ *
+ * char*  str_to_cstring(const String* s)
+ * Returns null terminated c string. you have to use free() on returned pointer.
  *
  * ### Utility Functions ###
  *
@@ -282,15 +285,15 @@ void str_rewind(String* s) {
 }
 
 // Returns a deep copy of the given string. Caller must free it.
-String str_dup(String s) {
-  String dup = str_declare(s.capacity);
+String str_dup(const String* s) {
+  String dup = str_declare(s->capacity);
   if (dup.capacity == 0) {
     debug_raise_err(NULL_REFERENCE, "failed to create duplicate");
     return dup;
   }
-  dup.length = s.length;
-  dup.scalable = s.scalable;
-  for (int i = 0; i < s.length; i++) dup.str[i] = s.str[i];
+  dup.length = s->length;
+  dup.scalable = s->scalable;
+  for (int i = 0; i < s->length; i++) dup.str[i] = s->str[i];
   return dup;
 }
 
@@ -574,6 +577,17 @@ int str_replace_first(String* s, int start, const char* search_key, uint32_t key
 void str_replace_all(String* s, const char* search_key, uint32_t key_length, const char* replace_with, uint32_t val_length) {
   int pos = 0;
   while ((pos = str_replace_first(s, pos, search_key, key_length, replace_with, val_length)) != -1);
+}
+
+// Returns null terminated c string. you have to use free() on returned pointer.
+char*  str_to_cstring(const String* s) {
+  char* cstring = malloc((sizeof(char) * s->length) + 1);
+  if (cstring == NULL) {
+    debug_raise_err(MALLOC_FAILURE, NULL);
+  } 
+  for (size_t i = 0; i < s->length; i++) cstring[i] = s->str[i];
+  cstring[s->length] = '\0';
+  return cstring;
 }
 
 // Frees the memory allocated for the string and resets metadata.

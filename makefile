@@ -23,7 +23,3 @@ target:
 	@echo "Creating directory ./target"
 	mkdir -p ./target
 
-
-# Clean target
-clean:
-	rm -rf obj target/$(DEBUG)
