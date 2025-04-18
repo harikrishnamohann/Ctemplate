@@ -9,13 +9,6 @@
  * In this implementation, strings are not meant to be null-terminated.
  * String's length is available in the type itself for concluding the end.
  * There are two kinds of strings:
- * 1. Scalable: Scalable strings can resize itself like Vector in C++;
- *    Example: String s = str_declare(SCALABLE);
- * 2. Non-scalable: These are strings with fixed size.
- *    Example: String buffer = str_declare(128);
- *
- * Most functions rely on `debug_raise_err()` (defined in "err.c") for error
- * reporting and return status codes defined in err.c.
  *
  **************************************************************************
  * [IMPORTANT NOTE!] Memory management:
@@ -26,119 +19,6 @@
  * Modify this library as per the requirements. For instance, if you wanna use
  * an arena allocator for handling memory, you want may edit the methods that 
  * calls malloc() and realloc().
- *
- * ## Function Reference ##
- *
- * ### Creation and Initialization ###
- *
- * String str_declare(uint64_t capacity)
- * Initializes an empty string with the specified capacity.
- * `capacity = SCALABLE` enables automatic scaling.
- *
- * String str_init(const char* s)
- * Initializes a String from a null-terminated C string.
- *
- * ### Insertion and Deletion ###
- *
- * int str_insert(String* str, int64_t index, char ch)
- * Inserts a character at the specified index (supports negative indexing).
- * Resizes the string exponentially if it is scalable. Returns status code.
- *
- * char str_remove(String* str, int64_t index)
- * Removes and returns the character at the specified index (supports negative indexing).
- * Returns RECONSIDER on error.
- *
- * ### String Manipulation ###
- *
- * String str_dup(const String* s)
- * Returns a deep copy of the given string. The caller is responsible for freeing the memory.
- *
- * String str_join(String a, String b)
- * Returns a new string by concatenating `a` and `b`.
- * The result is scalable if either `a` or `b` is scalable.
- * The caller is responsible for freeing the memory.
- *
- * int str_concat(String* dest, const String src)
- * Appends the contents of `src` to the end of `dest`.
- * Requires `dest` to be scalable. Returns status code.
- *
- * int str_copy(String* dest, const String src)
- * Replaces the contents of `dest` with the contents of `src`.
- * Resizes `dest` if needed. Requires `dest` to be scalable. Returns status code.
- *
- * int str_replace_first(String* str, int start, const char* key, uint32_t key_len, const char* target, uint32_t target_len)
- * Replaces the first occurrence of `key` within `str` (starting from `start`)
- * with `target`. Resizes `str` if necessary. Requires `str` to be scalable.
- * Returns the index after the replacement or RECONSIDER on error.
- *
- * void str_replace_all(String* str, const char* key, uint32_t key_len, const char* replace_with, uint32_t val_len)
- * Replaces all occurrences of `key` within `str` with `replace_with`.
- * Requires `str` to be scalable.
- *
- * ### Substring Operations ###
- *
- * const String str_slice(const String* str, uint64_t start, uint64_t end)
- * Returns a non-owning reference (view) into a substring of a non-scalable string.
- * No new memory is allocated.
- *
- * String str_owned_slice(String* s, uint64_t start, uint64_t end)
- * Returns an owning reference to a substring of a non-scalable String.
- * The extracted slice is moved to the beginning of the original string,
- * and the original string's internal pointer is offset.
- * The caller can free either the slice or the original string once.
- *
- * ### String Comparison ###
- *
- * int str_cmp(const String a, const String b)
- * Performs a lexicographical comparison between `a` and `b`.
- * Returns 0 if equal, >0 if `a` > `b`, and <0 if `a` < `b`.
- *
- * ### Searching ###
- *
- * int64_t str_contains(const String src, const char* key, uint64_t key_len)
- * Returns the index of the first occurrence of `key` within `src`,
- * or RECONSIDER if `key` is not found.
- *
- * ### String Formatting ###
- *
- * String str_compose(const char* fmt, ...)
- * Returns a non-scalable formatted String, similar to `sprintf`.
- * The caller is responsible for freeing the memory.
- *
- * ### Type Conversion ###
- *
- * int64_t str_to_int64(const String s)
- * Converts the string `s` to an `int64_t`.
- * Returns RECONSIDER if the input string is not a valid integer.
- *
- * double str_to_double(const String s)
- * Converts the string `s` to a `double`.
- * Returns RECONSIDER on failure (e.g., invalid input).
- *
- * char*  str_to_cstring(const String* s)
- * Returns null terminated c string. you have to use free() on returned pointer.
- *
- * ### Utility Functions ###
- *
- * void str_offset(String* s, int64_t offset)
- * Moves the internal pointer to a relative position based on the specified offset.
- *
- * void str_rewind(String* s)
- * Rewinds the internal pointer of an offset string back to the beginning (offset 0).
- *
- * void str_free(String* str)
- * Frees the memory allocated for the string and resets its metadata.
- *
- * ### Macro Shorthands ###
- *
- * int64_t str_contains_using_str(const String src_str, const String key_str)
- * A shorthand for `str_contains()` that accepts String types for both source and key.
- *
- * int str_replace_first_using_str(String* str_ptr, int start, String key_str, String target_str)
- * A shorthand for `str_replace_first()` that accepts String types for key and target.
- *
- * void str_replace_all_using_str(String* str_ptr, String key_str, String target_str)
- * A shorthand for `str_replace_all()` that accepts String types for key and replacement.
  *
  * Author: Harikrishna Mohan
  * Date: April-11-2025
@@ -153,21 +33,23 @@
 #include <stdbool.h>
 
 #include "err.c"
-#define DEBUG_ACTION WARN
 
-#define SCALABLE 0
+#define STR_DYNAMIC 0
 #define STR_BEGIN 0
 #define STR_END -1
 
 // scale factor for scalable strings
-#define SCALE_FACTOR 2.0
+#define _STR_SCALE_FACTOR 2.0
+#define STR_EMPTY ((String) { NULL, 0, 0, 0, 0 })
+
+#define str_debug_print(str) (_str_debug_print(#str, &str))
 
 typedef struct {
   char* str;
   uint64_t capacity;
   uint64_t length;
-  bool scalable;
   int64_t offset;
+  bool mutable;
 } String;
 
 uint64_t str_len(const char* str) {
@@ -176,34 +58,87 @@ uint64_t str_len(const char* str) {
   return len;
 }
 
-void _str_scale(String* s, float scale_factor) {
+// Moves the pointer to a relative position based on specified offset.
+int8_t str_offset(String* s, int64_t offset) {
+  if (offset == 0) return OK;
+  if (offset > (signed)s->length || offset * -1 > (signed)s->offset) {
+    printf("%s(): invalid offset position\n", __FUNCTION__);
+    return BAD;
+  }
+  s->length -= offset;
+  s->offset += offset;
+  s->str += offset;
+  return OK;
+}
+
+// rewinds offseted string back to 0
+int64_t str_rewind(String* s) {
+  if (s->offset == 0) return OK;
+  int64_t current_offset = s->offset;
+  s->length += current_offset;
+  s->str -= current_offset;
+  s->offset = 0;
+  return current_offset;
+}
+
+int8_t str_scale(String* s, float scale_factor) {
+  if (!s->mutable) {
+    printf("%s(): can't modify a slice\n", __FUNCTION__);
+    return BAD;
+  }
+
+  int64_t offset = str_rewind(s);
   s->str = realloc(s->str, (uint64_t)(s->capacity * scale_factor));
   if (s->str == NULL) {
-    debug_raise_err(MALLOC_FAILURE, "Failed to scale string!");
+    printf("%s(): Failed to scale string!\n", __FUNCTION__);
+    return HALT;
   }
+  str_offset(s, offset);
+
   s->capacity *= scale_factor;
+  return OK;
+}
+
+void _str_debug_print(const char* var, const String* s) {
+  printf("%s{ capacity:%lu, length:%lu, offset:%lu, mutable:%s, str:%p };\n", 
+         var, s->capacity, s->length, s->offset, (s->mutable) ?"yes":"no", s->str);
+  if (s->str == NULL) return;
+  printf("%s => \"", var);
+  if (s->length <= 75) {
+    for (size_t i = 0; i < s->length; i++) {
+      printf("%c", s->str[i]);
+    }
+  } else {
+    for (size_t i = 0; i <= 20; i++) {
+      printf("%c", s->str[i]);
+    }
+    printf("... ...");
+    for (size_t i = s->length - 20; i < s->length; i++) {
+      printf("%c", s->str[i]);
+    }
+  }
+  printf("\"\n");
 }
 
 // Initializes an empty string with the specified capacity.
-// If capacity == SCALABLE, it enables automatic scaling.
-// Caller must free it using str_free().
+// Caller must free returned value using str_free().
 String str_declare(uint64_t capacity) {
   if (capacity < 0) {
-    debug_raise_err(INVALID_SIZE_ERR, "invalid string capacity");
+    printf("%s(): invalid string capacity\n", __FUNCTION__);
+    return STR_EMPTY;
   }
   String s;
   s.length = 0;
   s.offset = 0;
-  if (capacity == SCALABLE) {
+  if (capacity == STR_DYNAMIC) {
     capacity = 1;
-    s.scalable = true;
-  } else {
-    s.scalable = false;
   }
+  s.mutable = true;
   s.capacity = capacity;
   s.str = (char*)malloc(sizeof(char) * capacity);
   if (s.str == NULL) {
-    debug_raise_err(MALLOC_FAILURE, NULL);
+    printf("%s(): malloc() failed\n", __FUNCTION__);
+    return STR_EMPTY;
   }
   return s;
 }
@@ -211,6 +146,8 @@ String str_declare(uint64_t capacity) {
 // Initializes a String from a null-terminated C string.
 String str_init(const char* s) {
   String str = str_declare(str_len(s));
+  if (str.capacity == STR_EMPTY.capacity)
+    return STR_EMPTY;
   str.length = str.capacity;
   for (int i = 0; i < str.length; i++) str.str[i] = s[i];
   return str;
@@ -218,23 +155,19 @@ String str_init(const char* s) {
 
 // Inserts a character at the specified index (supports negative indexing).
 // Resizes the string exponentially if the string is scalable.
- int str_insert(String* s, int64_t pos, char ch) {
+ int8_t str_insert(String* s, int64_t pos, char ch) {
   // validate pos
   if (pos < 0) { // for negative index access
     pos = s->length + pos + 1;
   }
   if (pos > s->length || pos < 0) { // check for invalid pos
-    debug_raise_err(INDEX_OUT_OF_BOUNDS, "invalid access positon");
-    return RECONSIDER;
+    printf("%s(): invalid access positon\n", __FUNCTION__);
+    return BAD;
   }
   // deal with string capacity
-  if (s->length >= s->capacity) { // string is full
-    if (s->scalable) { // reallocate if the user want an arraylist
-      _str_scale(s, SCALE_FACTOR);
-    } else { // not possible to add more characters
-      debug_raise_err(INDEX_OUT_OF_BOUNDS, "str is not scalable");
-      return RECONSIDER;
-    }
+  if (s->length == s->capacity) { // string is full
+    int8_t ret = str_scale(s, _STR_SCALE_FACTOR);
+    if (ret == BAD || ret == HALT) return ret;
   }
   // assign ch to required pos
   for (int64_t i = s->length - 1; i >= pos; i--) {
@@ -243,22 +176,22 @@ String str_init(const char* s) {
 
   s->str[pos] = ch;
   s->length++;
-  return PROCEED;
+  return OK;
 }
 
 // Removes and returns the character at the specified index.
 // Supports negative indexing.
 char str_remove(String* s, int64_t pos) {
   if (s->length <= 0) {
-    debug_raise_err(INDEX_OUT_OF_BOUNDS, "cannot remove from an empty string.");
-    return RECONSIDER;
+    printf("%s(): cannot perform remove from an empty string.\n", __FUNCTION__);
+    return BAD;
   }
   if (pos < 0) { // normalize index
     pos = s->length + pos;
   }
   if (pos > s->length || pos < 0) { // check for invalid pos
-    debug_raise_err(INDEX_OUT_OF_BOUNDS, "invalid access positon");
-    return RECONSIDER;
+    printf("%s(): invalid access positon\n", __FUNCTION__);
+    return BAD;
   }
 
   char ch = s->str[pos];
@@ -269,64 +202,36 @@ char str_remove(String* s, int64_t pos) {
   return ch;
 }
 
-// Moves the pointer to a relative position based on specified offset.
-void str_offset(String* s, int64_t offset) {
-  if (offset > (signed)s->length || offset * -1 > (signed)s->offset) {
-    debug_raise_err(INDEX_OUT_OF_BOUNDS, "invalid offset");
-    return;
-  }
-  s->length -= offset;
-  s->offset += offset;
-  s->str += offset;
-}
-
-// rewinds offseted string back to 0
-void str_rewind(String* s) {
-  s->length += s->offset;
-  s->str -= s->offset;
-  s->offset = 0;
-}
-
 // Returns a deep copy of the given string. Caller must free it.
 String str_dup(const String* s) {
   String dup = str_declare(s->capacity);
-  if (dup.capacity == 0) {
-    debug_raise_err(NULL_REFERENCE, "failed to create duplicate");
-    return dup;
+  if (dup.capacity == STR_EMPTY.capacity) {
+    printf("%s(): failed to create duplicate\n", __FUNCTION__);
+    return STR_EMPTY;
   }
   dup.length = s->length;
-  dup.scalable = s->scalable;
   for (int i = 0; i < s->length; i++) dup.str[i] = s->str[i];
   return dup;
 }
 
-// Returns a view (non-owning reference) into a non-scalable substring.
-// No memory is allocated. Useful for efficient slicing.
-// you can either pass the slice or the original string into free once.
 String str_slice(const String* s, uint64_t start, uint64_t end) {
   if (end > s->length || start >= end) {
-    printf("length: %lu, start: %lu, end: %lu\n", s->length, start, end);
-    debug_raise_err(INDEX_OUT_OF_BOUNDS, "incorrect slice length");
-    return (String) {NULL, 0, 0};
+    printf("%s(): incorrect slice length\nlength: %lu, start: %lu, end: %lu\n", __FUNCTION__, s->length, start, end);
+    return STR_EMPTY;
   }
   return (String) {
     .length = end - start,
     .str = s->str + start,
     .capacity = s->capacity,
-    .scalable = false,
+    .mutable = false,
     .offset = s->str - s->str + start,
   }; 
 }
 
-// Returns an owned reference into a non-scalable String.
-// The Returned slice will be removed from original string.
-// No memory is allocated.
-// you can either pass the slice or the original string into str_free() once.
-String str_owned_slice(String* s, uint64_t start, uint64_t end) {
+String str_slice_owned(String* s, uint64_t start, uint64_t end) {
   if (end > s->length || start >= end) {
-    printf("length: %lu, start: %lu, end: %lu\n", s->length, start, end);
-    debug_raise_err(INDEX_OUT_OF_BOUNDS, "incorrect slice length");
-    return (String) {NULL, 0, 0};
+    printf("%s(): incorrect slice length\nlength: %lu, start: %lu, end: %lu\n", __FUNCTION__, s->length, start, end);
+    return STR_EMPTY;
   }
 
   String slice = {
@@ -334,7 +239,7 @@ String str_owned_slice(String* s, uint64_t start, uint64_t end) {
     .length = end - start,
     .capacity = end - start,
     .offset = s->offset,
-    .scalable = false
+    .mutable = false
   };
 
   for (int i = 0; i < slice.length; i++) {
@@ -345,72 +250,75 @@ String str_owned_slice(String* s, uint64_t start, uint64_t end) {
     slice.str[i] = tmp;
   }
 
-  str_offset(s, slice.length);
+  if (str_offset(s, slice.length) == BAD) return STR_EMPTY;
   return slice;
 }
 
-// Returns a new string by concatenating `a` and `b`.
-// The resultant is scalable if either a or b is scalable.
-// Caller must free the memory allocated for return value.
-String str_join(String a, String b) {
-  String result = str_declare(a.capacity + b.capacity); 
-  result.length = a.length + b.length;
-  result.scalable = a.scalable || b.scalable;
+String str_join(const String *a, const String *b) {
+  String result = str_declare(a->capacity + b->capacity); 
+  if (result.capacity == STR_EMPTY.capacity)
+    return STR_EMPTY;
+  
+  result.length = a->length + b->length;
   int j = 0;
-  for (int i = 0; i < a.length; i++, j++) result.str[j] = a.str[i];
-  for (int i = 0; i < b.length; i++, j++) result.str[j] = b.str[i];
+  for (int i = 0; i < a->length; i++, j++) result.str[j] = a->str[i];
+  for (int i = 0; i < b->length; i++, j++) result.str[j] = b->str[i];
   return result;
 }
 
-// Appends `src` to `dest`. Requires `dest` to be scalable.
-int str_concat(String *dest, const String src) {
-  if (!dest->scalable) {
-    debug_raise_err(RESIZE_ERR, "dest is not scalable"); 
-    return HALT;
+int8_t str_concat(String *dest, const String* src) {
+  if (!dest->mutable) {
+    printf("%s(): Can't modify a slice\n", __FUNCTION__); 
+    return BAD;
   }
-  dest->capacity += src.capacity;
+  dest->capacity += src->capacity;
+
+  int64_t offset = str_rewind(dest);
   dest->str  = realloc(dest->str, sizeof(char) * dest->capacity);
   if(dest->str == NULL) {
-    debug_raise_err(MALLOC_FAILURE, NULL);
-  }
-  for (int i = dest->length, j = 0; j < src.length; i++, j++) dest->str[i] = src.str[j];
-  dest->length += src.length;
-  return 0;
-}
-
-// Replaces contents of `dest` with `src`. scales if needed.
-// Requires `dest` to be scalable.
-int str_copy(String *dest, const String src) {
-  if (!dest->scalable) {
-    debug_raise_err(RESIZE_ERR, "dest is not scalable"); 
+    printf("%s(): malloc failed.\n", __FUNCTION__);
     return HALT;
   }
-  if (dest->capacity < src.length) {
-    dest->capacity += src.length - dest->capacity;
+  str_offset(dest, offset);
+
+  for (int i = dest->length, j = 0; j < src->length; i++, j++) dest->str[i] = src->str[j];
+  dest->length += src->length;
+  return OK;
+}
+
+int str_copy(String *dest, const String* src) {
+  if (!dest->mutable) {
+    printf("%s(): Can't modify a slice\n", __FUNCTION__); 
+    return BAD;
+  }
+  if (dest->capacity < src->length) {
+    dest->capacity += src->length - dest->capacity;
+
+    int64_t offset = str_rewind(dest);
     dest->str = realloc(dest->str, dest->capacity + 1);
     if (dest->str == NULL) {
-      debug_raise_err(MALLOC_FAILURE, "realloc() failed.");
-      return -1;
+      printf("%s(): realloc() failed.\n", __FUNCTION__);
+      return HALT;
     }
+    str_offset(dest, offset);
+
   }
-  for (int i = 0; i < src.length; i++) {
-    dest->str[i] = src.str[i];
+  for (int i = 0; i < src->length; i++) {
+    dest->str[i] = src->str[i];
   }
-  dest->length = src.length;
-  return 0;
+  dest->length = src->length;
+  return OK;
 }
 
 // Lexicographical comparison: 
 // returns 0 if equal, >0 if a > b, <0 if a < b.
-int str_cmp(const String a, const String b) {
-  for (int i = 0; i < a.length && i < b.length; i++) {
-    if (a.str[i] != b.str[i]) return a.str[i] - b.str[i];
+int32_t str_cmp(const String* a, const String* b) {
+  for (int i = 0; i < a->length && i < b->length; i++) {
+    if (a->str[i] != b->str[i]) return a->str[i] - b->str[i];
   }
-  return a.length - b.length;
+  return a->length - b->length;
 }
 
-// Returns a non-scalable formatted String (like sprintf).
-// Caller must free.
 String str_compose(const char* fmt, ...) {
     va_list args;
     va_start(args, fmt);
@@ -418,10 +326,13 @@ String str_compose(const char* fmt, ...) {
     va_end(args);
 
     if (req_length < 0) {
-        debug_raise_err(MALLOC_FAILURE, "Error in vsnprintf format");
+      printf("%s(): Error in format string\n", __FUNCTION__);
+      return STR_EMPTY;
     }
 
     String composed = str_declare(req_length + 1);
+    if (composed.capacity == STR_EMPTY.capacity)
+      return STR_EMPTY;
 
     va_start(args, fmt);
     vsnprintf(composed.str, composed.capacity, fmt, args);
@@ -431,89 +342,89 @@ String str_compose(const char* fmt, ...) {
     return composed;
 }
 
-// Returns the index of the first occurrence of `key` in `src`, or RECONSIDER.
-int64_t str_contains(const String src, const char* key, uint64_t key_len) {
+// Returns the index of the first occurrence of `key` in `src`, or BAD if not found
+int64_t str_contains(const String* src, const char* key, uint64_t key_len) {
   int pos;
-  for (int i = 0; i < src.length; i++) {
-    for (pos = 0; pos < key_len && src.str[i + pos] == key[pos]; pos++);
+  for (int i = 0; i < src->length; i++) {
+    for (pos = 0; pos < key_len && src->str[i + pos] == key[pos]; pos++);
     if (pos == key_len) {
       return i;
     }
   }
-  return RECONSIDER;
+  return BAD;
 }
 
-// Converts the string to int64_t. Returns RECONSIDER if invalid input.
-static void print_invalid_number_err_msg(const String s, int i) {
-    for (int j = 0; j < s.length; j++) {
+// for printing debug information in number conversions.
+static void print_invalid_number_err_msg(const String* s, int i) {
+    for (int j = 0; j < s->length; j++) {
       if (j == i) {
-        printf("\033[0;31m%c\033[0m", s.str[i]);
+        printf("%s(): \033[0;31m%c\033[0m", __FUNCTION__, s->str[i]);
       } else {
-        printf("%c", s.str[j]);
+        printf("%s(): %c", __FUNCTION__, s->str[j]);
       }
     }
-    printf("\n");
+    printf("%s(): \n", __FUNCTION__);
     for (int j = 0; j < i; j++) printf(" ");
     printf("^ invalid character found.\n");
 }
 
-// Converts the string to a double. Returns RECONSIDER on failure.
-int64_t str_to_int64(const String s) {
+// Converts the string to a double. Returns BAD on failure.
+int64_t str_to_int64(const String* s) {
+  if (s->length == 0) return BAD;
   int8_t sign = 1;
   int i = 0;
   int64_t result = 0;
-  if (s.length == 0) return 0;
 
-  if (s.str[0] == '-') {
+  if (s->str[0] == '-') {
     sign = -1;
     i++;
-  } else if (s.str[0] == '+') {
+  } else if (s->str[0] == '+') {
     i++;
   }
-  while (i < s.length && s.str[i] >= '0' && s.str[i] <= '9') {
-    result = result * 10 + (s.str[i] - '0');
+  while (i < s->length && s->str[i] >= '0' && s->str[i] <= '9') {
+    result = result * 10 + (s->str[i] - '0');
     i++;
   }
-  if (i != s.length){
-    debug_raise_err(ARITHMETIC_ERR, "error converting to double: invalid character found.");
+  if (i != s->length){
+    printf("%s(): error converting to double: invalid character found\n", __FUNCTION__);
     print_invalid_number_err_msg(s, i);
-    return RECONSIDER;
+    return BAD;
   }
   return result * sign;
 }
 
 // converts string to double
-double str_to_double(const String s) {
+double str_to_double(const String* s) {
+  if (s->length == 0) return BAD;
   double result = 0.0;
   int8_t sign = 1;
   uint32_t i = 0;
-  if (s.length == 0) return 0.0;
 
-  if (s.str[0] == '-') {
+  if (s->str[0] == '-') {
     sign = -1;
     i++;
-  } else if (s.str[0] == '+') {
+  } else if (s->str[0] == '+') {
     i++;
   }
 
-  while (i < s.length && s.str[i] >= '0' && s.str[i] <= '9') {
-    result = result * 10.0 + (s.str[i] - '0');
+  while (i < s->length && s->str[i] >= '0' && s->str[i] <= '9') {
+    result = result * 10.0 + (s->str[i] - '0');
     i++;
   }
-  if (i < s.length && s.str[i] == '.') {
+  if (i < s->length && s->str[i] == '.') {
     i++;
     double fraction = 0.1;
-    while (i < s.length && s.str[i] >= '0' && s.str[i] <= '9') {
-      result += (s.str[i] - '0') * fraction;
+    while (i < s->length && s->str[i] >= '0' && s->str[i] <= '9') {
+      result += (s->str[i] - '0') * fraction;
       fraction /= 10.0;
       i++;
     }
   }
 
-  if (i != s.length){
-    debug_raise_err(ARITHMETIC_ERR, "error converting to double: invalid character found.");
+  if (i != s->length){
+    printf("%s(): error converting to double: invalid character found\n", __FUNCTION__);
     print_invalid_number_err_msg(s, i);
-    return RECONSIDER;
+    return BAD;
   }
   return result * sign;
 }
@@ -522,13 +433,13 @@ double str_to_double(const String s) {
 // Scales if necessary.
 // Requires str to be scalable.
 int str_replace_first(String* s, int start, const char* search_key, uint32_t key_len, const char* target, uint32_t target_len) {
-  if (!s->scalable) {
-    debug_raise_err(RESIZE_ERR, "dest is not Scalable type"); 
-    return HALT;
+  if (!s->mutable) {
+    printf("%s(): Cannot modify a slice\n", __FUNCTION__);
+    return BAD;
   }
   if (start < 0 || start >= s->length) {
-    debug_raise_err(INDEX_OUT_OF_BOUNDS, "invalid start index");    
-    return RECONSIDER;
+    printf("%s(): invalid start index\n", __FUNCTION__);    
+    return BAD;
   }
 
   uint32_t span_start; // to store begin index of key in s
@@ -543,10 +454,10 @@ int str_replace_first(String* s, int start, const char* search_key, uint32_t key
   }
 
   if (!contains) { // return if key is not present in s
-    return RECONSIDER;
+    return BAD;
   }
 
-  if (str_cmp((String){(char*)search_key, key_len, key_len}, (String){(char*)target, target_len, target_len}) == 0) {
+  if (str_cmp(&(String){(char*)search_key, key_len, key_len}, &(String){(char*)target, target_len, target_len}) == 0) {
     goto ret; // no need of replacement if key and value are same. just return.
   }
 
@@ -560,7 +471,16 @@ int str_replace_first(String* s, int start, const char* search_key, uint32_t key
   } else if (diff < 0) { // target string is longer than search_key
     diff *= -1;
     if (s->length + diff > s->capacity) {
-      _str_scale(s, 1.5);
+
+      int64_t offset = str_rewind(s);
+      s->str = realloc(s->str, sizeof(char) * (s->capacity + diff) + 1);
+      if (s->str == NULL) {
+        printf("%s(): malloc failure.\n", __FUNCTION__);
+        return HALT;
+      }
+      str_offset(s, offset);
+
+      s->capacity += diff;
       s->length += diff;
       for (int j = s->length - 1; j >= span_end; j--) {
         s->str[j + diff] = s->str[j];
@@ -577,16 +497,18 @@ int str_replace_first(String* s, int start, const char* search_key, uint32_t key
 }
 
 // Replaces all occurrences of `key` with `replace_with`.
-void str_replace_all(String* s, const char* search_key, uint32_t key_length, const char* replace_with, uint32_t val_length) {
+int8_t str_replace_all(String* s, const char* search_key, uint32_t key_length, const char* replace_with, uint32_t val_length) {
   int pos = 0;
-  while ((pos = str_replace_first(s, pos, search_key, key_length, replace_with, val_length)) != -1);
+  while ((pos = str_replace_first(s, pos, search_key, key_length, replace_with, val_length)) != BAD);
+  return pos;
 }
 
 // Returns null terminated c string. you have to use free() on returned pointer.
 char*  str_to_cstring(const String* s) {
   char* cstring = malloc((sizeof(char) * s->length) + 1);
   if (cstring == NULL) {
-    debug_raise_err(MALLOC_FAILURE, NULL);
+    printf("%s(): malloc failure\n", __FUNCTION__);
+    return NULL;
   } 
   for (size_t i = 0; i < s->length; i++) cstring[i] = s->str[i];
   cstring[s->length] = '\0';
@@ -600,16 +522,17 @@ void str_free(String* s) {
   free(s->str - s->offset);
   s->offset = 0;
   s->str = NULL;
+  s->mutable = false;
 }
 
 // shorthand of str_replace_first() using String types.
-#define str_replace_first_using_str(str_ptr, start, key_str, target_str) \
-  str_replace_first(str_ptr, start, key_str.str, key_str.length, target_str.str, target_str.length)
+#define sstr_replace_first(str_ptr, start, key_str, target_str) \
+  str_replace_first(str_ptr, start, (key_str)->str, (key_str)->length, (target_str)->str, (target_str)->length)
 
 // shorthand of str_replace_all() using String types.
-#define str_replace_all_using_str(str_ptr, key_str, target_str) \
+#define sstr_replace_all(str_ptr, key_str, target_str) \
   str_replace_all(str_ptr, key_str.str, key_str.length, target_str.str, target_str.length)
 
 // shorthand of str_contains() using String types.
-#define str_contains_using_str(src_str, key_str) \
-  (str_contains(src_str, key_str.str, key_str.length))
+#define sstr_contains(src_str, key_str) \
+  (str_contains(src_str, (key_str)->str, (key_str)->length))

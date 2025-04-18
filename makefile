@@ -1,4 +1,4 @@
-CC = gcc
+CC = clang
 CFLAGS = -std=c23 -Wall -Werror
 DEBUG = debug
 RELEASE = release
@@ -12,10 +12,10 @@ run: target target/$(DEBUG)
 	./target/$(DEBUG)
 
 
-target/$(RELEASE): src/*
+target/$(RELEASE): src/* lib/*
 	$(CC) -o3 src/main.c -o $@
 
-target/$(DEBUG): src/*
+target/$(DEBUG): src/* lib/*
 	$(CC) -g $(CFLAGS) src/main.c -o $@ 
 
 # directory check
