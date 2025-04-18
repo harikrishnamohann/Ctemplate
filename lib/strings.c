@@ -52,13 +52,16 @@ typedef struct {
   bool mutable;
 } String;
 
+// Calculates the length of a null-terminated C string.
+// Returns the length of the string (excluding the null terminator).
 uint64_t str_len(const char* str) {
   uint64_t len = 0;
   while (str[len] != '\0') len++;
   return len;
 }
 
-// Moves the pointer to a relative position based on specified offset.
+// Moves the internal pointer of the string by the specified relative offset.
+// Returns OK on success, BAD on invalid offset.
 int8_t str_offset(String* s, int64_t offset) {
   if (offset == 0) return OK;
   if (offset > (signed)s->length || offset * -1 > (signed)s->offset) {
@@ -71,7 +74,8 @@ int8_t str_offset(String* s, int64_t offset) {
   return OK;
 }
 
-// rewinds offseted string back to 0
+// Rewinds the internal pointer of an offset string back to the beginning (offset 0).
+// Returns the original offset on success, OK if the offset was already 0.
 int64_t str_rewind(String* s) {
   if (s->offset == 0) return OK;
   int64_t current_offset = s->offset;
@@ -81,6 +85,9 @@ int64_t str_rewind(String* s) {
   return current_offset;
 }
 
+// Resizes the underlying buffer of the string by multiplying the capacity with the scale factor.
+// This function is primarily used internally.
+// Returns OK on success, BAD if the string is a non-mutable slice, HALT on memory allocation failure.
 int8_t str_scale(String* s, float scale_factor) {
   if (!s->mutable) {
     printf("%s(): can't modify a slice\n", __FUNCTION__);
@@ -99,6 +106,7 @@ int8_t str_scale(String* s, float scale_factor) {
   return OK;
 }
 
+// Prints detailed debug information about a String object. This is primarily for internal debugging.
 void _str_debug_print(const char* var, const String* s) {
   printf("%s{ capacity:%lu, length:%lu, offset:%lu, mutable:%s, str:%p };\n", 
          var, s->capacity, s->length, s->offset, (s->mutable) ?"yes":"no", s->str);
@@ -120,8 +128,9 @@ void _str_debug_print(const char* var, const String* s) {
   printf("\"\n");
 }
 
-// Initializes an empty string with the specified capacity.
-// Caller must free returned value using str_free().
+// Initializes an empty string with the specified initial capacity.
+// `capacity = STR_DYNAMIC` enables automatic resizing.
+// Returns STR_EMPTY on failure.
 String str_declare(uint64_t capacity) {
   if (capacity < 0) {
     printf("%s(): invalid string capacity\n", __FUNCTION__);
@@ -144,6 +153,7 @@ String str_declare(uint64_t capacity) {
 }
 
 // Initializes a String from a null-terminated C string.
+// Returns STR_EMPTY on failure.
 String str_init(const char* s) {
   String str = str_declare(str_len(s));
   if (str.capacity == STR_EMPTY.capacity)
@@ -154,7 +164,8 @@ String str_init(const char* s) {
 }
 
 // Inserts a character at the specified index (supports negative indexing).
-// Resizes the string exponentially if the string is scalable.
+// Automatically resizes the string if necessary.
+// Returns OK on success, BAD on invalid index, HALT on memory allocation failure.
  int8_t str_insert(String* s, int64_t pos, char ch) {
   // validate pos
   if (pos < 0) { // for negative index access
@@ -179,8 +190,8 @@ String str_init(const char* s) {
   return OK;
 }
 
-// Removes and returns the character at the specified index.
-// Supports negative indexing.
+// Removes and returns the character at the specified index (supports negative indexing).
+// Returns the removed character on success, BAD on error (empty string or invalid index).
 char str_remove(String* s, int64_t pos) {
   if (s->length <= 0) {
     printf("%s(): cannot perform remove from an empty string.\n", __FUNCTION__);
@@ -202,7 +213,8 @@ char str_remove(String* s, int64_t pos) {
   return ch;
 }
 
-// Returns a deep copy of the given string. Caller must free it.
+// Returns a deep copy of the given string. The caller is responsible for freeing the memory.
+// Returns STR_EMPTY on failure.
 String str_dup(const String* s) {
   String dup = str_declare(s->capacity);
   if (dup.capacity == STR_EMPTY.capacity) {
@@ -214,6 +226,8 @@ String str_dup(const String* s) {
   return dup;
 }
 
+// Returns a non-owning, non-mutable reference (view) into a substring of `str`.
+// No new memory is allocated. Returns STR_EMPTY on invalid slice parameters.
 String str_slice(const String* s, uint64_t start, uint64_t end) {
   if (end > s->length || start >= end) {
     printf("%s(): incorrect slice length\nlength: %lu, start: %lu, end: %lu\n", __FUNCTION__, s->length, start, end);
@@ -228,6 +242,11 @@ String str_slice(const String* s, uint64_t start, uint64_t end) {
   }; 
 }
 
+// Returns a non-owning, non-mutable reference to a substring of `s`.
+// The extracted slice is moved to the beginning of the original string,
+// and the original string's internal pointer is offset.
+// The caller can free either the slice or the original string once.
+// Returns STR_EMPTY on invalid slice parameters.
 String str_slice_owned(String* s, uint64_t start, uint64_t end) {
   if (end > s->length || start >= end) {
     printf("%s(): incorrect slice length\nlength: %lu, start: %lu, end: %lu\n", __FUNCTION__, s->length, start, end);
@@ -254,6 +273,9 @@ String str_slice_owned(String* s, uint64_t start, uint64_t end) {
   return slice;
 }
 
+// Returns a new string by concatenating `a` and `b`.
+// The caller is responsible for freeing the memory.
+// Returns STR_EMPTY on failure.
 String str_join(const String *a, const String *b) {
   String result = str_declare(a->capacity + b->capacity); 
   if (result.capacity == STR_EMPTY.capacity)
@@ -266,6 +288,9 @@ String str_join(const String *a, const String *b) {
   return result;
 }
 
+// Appends the contents of `src` to the end of `dest`.
+// Automatically resizes `dest` if necessary.
+// Returns OK on success, BAD if `dest` is a non-mutable slice, HALT on memory allocation failure.
 int8_t str_concat(String *dest, const String* src) {
   if (!dest->mutable) {
     printf("%s(): Can't modify a slice\n", __FUNCTION__); 
@@ -286,7 +311,10 @@ int8_t str_concat(String *dest, const String* src) {
   return OK;
 }
 
-int str_copy(String *dest, const String* src) {
+// Replaces the contents of `dest` with the contents of `src`.
+// Automatically resizes `dest` if needed.
+// Returns OK on success, BAD if `dest` is a non-mutable slice, HALT on memory allocation failure.
+int8_t str_copy(String *dest, const String* src) {
   if (!dest->mutable) {
     printf("%s(): Can't modify a slice\n", __FUNCTION__); 
     return BAD;
@@ -310,8 +338,8 @@ int str_copy(String *dest, const String* src) {
   return OK;
 }
 
-// Lexicographical comparison: 
-// returns 0 if equal, >0 if a > b, <0 if a < b.
+// Performs a lexicographical comparison between `a` and `b`.
+// Returns 0 if equal, >0 if `a` > `b`, and <0 if `a` < `b`.
 int32_t str_cmp(const String* a, const String* b) {
   for (int i = 0; i < a->length && i < b->length; i++) {
     if (a->str[i] != b->str[i]) return a->str[i] - b->str[i];
@@ -319,6 +347,9 @@ int32_t str_cmp(const String* a, const String* b) {
   return a->length - b->length;
 }
 
+// Returns a new formatted String, similar to `sprintf`.
+// The caller is responsible for freeing the memory.
+// Returns STR_EMPTY on failure.
 String str_compose(const char* fmt, ...) {
     va_list args;
     va_start(args, fmt);
@@ -342,7 +373,8 @@ String str_compose(const char* fmt, ...) {
     return composed;
 }
 
-// Returns the index of the first occurrence of `key` in `src`, or BAD if not found
+// Returns the index of the first occurrence of `key` within `src`,
+// or BAD if `key` is not found.
 int64_t str_contains(const String* src, const char* key, uint64_t key_len) {
   int pos;
   for (int i = 0; i < src->length; i++) {
@@ -368,7 +400,8 @@ static void print_invalid_number_err_msg(const String* s, int i) {
     printf("^ invalid character found.\n");
 }
 
-// Converts the string to a double. Returns BAD on failure.
+// Converts the string `s` to an `int64_t`.
+// Returns the converted integer on success, BAD if the input string is not a valid integer.
 int64_t str_to_int64(const String* s) {
   if (s->length == 0) return BAD;
   int8_t sign = 1;
@@ -393,7 +426,8 @@ int64_t str_to_int64(const String* s) {
   return result * sign;
 }
 
-// converts string to double
+// Converts the string `s` to a `double`.
+// Returns the converted double on success, BAD on failure (e.g., invalid input).
 double str_to_double(const String* s) {
   if (s->length == 0) return BAD;
   double result = 0.0;
@@ -429,9 +463,10 @@ double str_to_double(const String* s) {
   return result * sign;
 }
 
-// Replaces the first occurrence of `key` (after `start`) with `target`.
-// Scales if necessary.
-// Requires str to be scalable.
+// Replaces the first occurrence of `key` within `str` (starting from `start`)
+// with `target`. Automatically resizes `str` if necessary.
+// Returns the index after the replacement on success, BAD on error (non-mutable slice or invalid start index),
+// or if the key is not found, HALT on memory allocation failure.
 int str_replace_first(String* s, int start, const char* search_key, uint32_t key_len, const char* target, uint32_t target_len) {
   if (!s->mutable) {
     printf("%s(): Cannot modify a slice\n", __FUNCTION__);
@@ -503,7 +538,8 @@ int8_t str_replace_all(String* s, const char* search_key, uint32_t key_length, c
   return pos;
 }
 
-// Returns null terminated c string. you have to use free() on returned pointer.
+// Returns a null-terminated C string. The caller is responsible for freeing the returned pointer using `free()`.
+// Returns NULL on memory allocation failure.
 char*  str_to_cstring(const String* s) {
   char* cstring = malloc((sizeof(char) * s->length) + 1);
   if (cstring == NULL) {
