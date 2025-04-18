@@ -3,12 +3,13 @@
  * messing with C. I tried to implement most of the basic String operations
  * I can think of. I also implemented some features for the love of writing
  * string parsers. To be clear, all the operations related to the offset
- * parameter of String type is built up on my limited knolowed about building
+ * parameter of String type is built up on my limited knowledge about building
  * simple parsers.
  *
  * In this implementation, strings are not meant to be null-terminated.
  * String's length is available in the type itself for concluding the end.
- * There are two kinds of strings:
+ * The library won't allow any mutable operations (such as insert, copy)
+ * to modify immutable String entity (slices).
  *
  **************************************************************************
  * [IMPORTANT NOTE!] Memory management:
@@ -26,7 +27,7 @@
 
 #pragma once
 
-#include <malloc.h>
+#include <stdlib.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <stdarg.h>
@@ -38,8 +39,6 @@
 #define STR_BEGIN 0
 #define STR_END -1
 
-// scale factor for scalable strings
-#define _STR_SCALE_FACTOR 2.0
 #define STR_EMPTY ((String) { NULL, 0, 0, 0, 0 })
 
 #define str_debug_print(str) (_str_debug_print(#str, &str))
@@ -49,8 +48,10 @@ typedef struct {
   uint64_t capacity;
   uint64_t length;
   int64_t offset;
-  bool mutable;
+  bool mutable; // for handling slices.
 } String;
+
+const float _STR_SCALE_FACTOR = 2.0; // internal scale factor for resizing
 
 // Calculates the length of a null-terminated C string.
 // Returns the length of the string (excluding the null terminator).
@@ -95,11 +96,12 @@ int8_t str_scale(String* s, float scale_factor) {
   }
 
   int64_t offset = str_rewind(s);
-  s->str = realloc(s->str, (uint64_t)(s->capacity * scale_factor));
-  if (s->str == NULL) {
+  char* tmp = realloc(s->str, (uint64_t)(s->capacity * scale_factor));
+  if (tmp == NULL) {
     printf("%s(): Failed to scale string!\n", __FUNCTION__);
     return HALT;
   }
+  s->str = tmp;
   str_offset(s, offset);
 
   s->capacity *= scale_factor;
@@ -108,7 +110,7 @@ int8_t str_scale(String* s, float scale_factor) {
 
 // Prints detailed debug information about a String object. This is primarily for internal debugging.
 void _str_debug_print(const char* var, const String* s) {
-  printf("%s{ capacity:%lu, length:%lu, offset:%lu, mutable:%s, str:%p };\n", 
+  printf("%s::{ capacity:%lu, length:%lu, offset:%lu, mutable:%s, str:%p };\n", 
          var, s->capacity, s->length, s->offset, (s->mutable) ?"yes":"no", s->str);
   if (s->str == NULL) return;
   printf("%s => \"", var);
@@ -172,7 +174,7 @@ String str_init(const char* s) {
     pos = s->length + pos + 1;
   }
   if (pos > s->length || pos < 0) { // check for invalid pos
-    printf("%s(): invalid access positon\n", __FUNCTION__);
+    printf("%s(): invalid access position\n", __FUNCTION__);
     return BAD;
   }
   // deal with string capacity
@@ -200,7 +202,7 @@ char str_remove(String* s, int64_t pos) {
   if (pos < 0) { // normalize index
     pos = s->length + pos;
   }
-  if (pos > s->length || pos < 0) { // check for invalid pos
+  if (pos >= s->length || pos < 0) { // check for invalid pos
     printf("%s(): invalid access positon\n", __FUNCTION__);
     return BAD;
   }
@@ -238,7 +240,7 @@ String str_slice(const String* s, uint64_t start, uint64_t end) {
     .str = s->str + start,
     .capacity = s->capacity,
     .mutable = false,
-    .offset = s->str - s->str + start,
+    .offset = s->offset + start,
   }; 
 }
 
@@ -299,11 +301,12 @@ int8_t str_concat(String *dest, const String* src) {
   dest->capacity += src->capacity;
 
   int64_t offset = str_rewind(dest);
-  dest->str  = realloc(dest->str, sizeof(char) * dest->capacity);
-  if(dest->str == NULL) {
+  char* tmp  = realloc(dest->str, sizeof(char) * dest->capacity);
+  if(tmp == NULL) {
     printf("%s(): malloc failed.\n", __FUNCTION__);
     return HALT;
   }
+  dest->str = tmp;
   str_offset(dest, offset);
 
   for (int i = dest->length, j = 0; j < src->length; i++, j++) dest->str[i] = src->str[j];
@@ -323,11 +326,12 @@ int8_t str_copy(String *dest, const String* src) {
     dest->capacity += src->length - dest->capacity;
 
     int64_t offset = str_rewind(dest);
-    dest->str = realloc(dest->str, dest->capacity + 1);
-    if (dest->str == NULL) {
+    char* tmp = realloc(dest->str, dest->capacity + 1);
+    if (tmp == NULL) {
       printf("%s(): realloc() failed.\n", __FUNCTION__);
       return HALT;
     }
+    dest->str = tmp;
     str_offset(dest, offset);
 
   }
@@ -508,11 +512,12 @@ int str_replace_first(String* s, int start, const char* search_key, uint32_t key
     if (s->length + diff > s->capacity) {
 
       int64_t offset = str_rewind(s);
-      s->str = realloc(s->str, sizeof(char) * (s->capacity + diff) + 1);
-      if (s->str == NULL) {
+      char* tmp = realloc(s->str, sizeof(char) * (s->capacity + diff) + 1);
+      if (tmp == NULL) {
         printf("%s(): malloc failure.\n", __FUNCTION__);
         return HALT;
       }
+      s->str = tmp;
       str_offset(s, offset);
 
       s->capacity += diff;
@@ -553,12 +558,8 @@ char*  str_to_cstring(const String* s) {
 
 // Frees the memory allocated for the string and resets metadata.
 void str_free(String* s) {
-  s->capacity = 0;
-  s->length = 0;
   free(s->str - s->offset);
-  s->offset = 0;
-  s->str = NULL;
-  s->mutable = false;
+  *s = STR_EMPTY;
 }
 
 // shorthand of str_replace_first() using String types.
