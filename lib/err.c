@@ -1,5 +1,8 @@
 #pragma once
 
-#define OK 0
-#define BAD -1
-#define HALT -2
+typedef enum {
+    OK = 0,
+    BAD = -1,
+    HALT = -2,
+} Status;
+
