@@ -8,8 +8,11 @@
  *
  * In this implementation, strings are not meant to be null-terminated.
  * String's length is available in the type itself for concluding the end.
- * The library won't allow any mutable operations (such as insert, copy)
- * to modify immutable String entity (slices).
+ * String's are not fixed size. It is more like a vector or an arraylist.
+ * If string's capacity is not enough to perform any operations, its
+ * capacity will be increased by calling realloc() unless it is a slice
+ * (immutable).The library won't allow any mutable operations
+ * (such as insert, copy) to modify immutable strings.
  *
  **************************************************************************
  * [IMPORTANT NOTE!] Memory management:
@@ -86,6 +89,11 @@ int64_t str_rewind(String* s) {
   return current_offset;
 }
 
+uint64_t _ceil(double x) {
+    if (x >= 0 && (uint64_t)x == x) return x;
+    return (uint64_t)(x + 1);
+}
+
 // Resizes the underlying buffer of the string by multiplying the capacity with the scale factor.
 // This function is primarily used internally.
 // Returns OK on success, BAD if the string is a non-mutable slice, HALT on memory allocation failure.
@@ -96,7 +104,7 @@ int8_t str_scale(String* s, float scale_factor) {
   }
 
   int64_t offset = str_rewind(s);
-  char* tmp = realloc(s->str, (uint64_t)(s->capacity * scale_factor));
+  char* tmp = realloc(s->str, _ceil((float)s->capacity * scale_factor));
   if (tmp == NULL) {
     printf("%s(): Failed to scale string!\n", __FUNCTION__);
     return HALT;
@@ -249,7 +257,7 @@ String str_slice(const String* s, uint64_t start, uint64_t end) {
 // and the original string's internal pointer is offset.
 // The caller can free either the slice or the original string once.
 // Returns STR_EMPTY on invalid slice parameters.
-String str_slice_owned(String* s, uint64_t start, uint64_t end) {
+String str_slice_head(String* s, uint64_t start, uint64_t end) {
   if (end > s->length || start >= end) {
     printf("%s(): incorrect slice length\nlength: %lu, start: %lu, end: %lu\n", __FUNCTION__, s->length, start, end);
     return STR_EMPTY;
@@ -377,11 +385,11 @@ String str_compose(const char* fmt, ...) {
     return composed;
 }
 
-// Returns the index of the first occurrence of `key` within `src`,
-// or BAD if `key` is not found.
-int64_t str_contains(const String* src, const char* key, uint64_t key_len) {
+// Returns the index of the first occurrence of `key` after `start` within
+// `src`, or BAD if `key` is not found.
+int64_t str_contains(const String* src, int64_t start, const char* key, uint64_t key_len) {
   int pos;
-  for (int i = 0; i < src->length; i++) {
+  for (int i = start; i < src->length; i++) {
     for (pos = 0; pos < key_len && src->str[i + pos] == key[pos]; pos++);
     if (pos == key_len) {
       return i;
@@ -480,24 +488,12 @@ int str_replace_first(String* s, int start, const char* search_key, uint32_t key
     printf("%s(): invalid start index\n", __FUNCTION__);    
     return BAD;
   }
-
-  uint32_t span_start; // to store begin index of key in s
-  int8_t contains = 0;
-  for (int i = start; i < s->length; i++) {
-    for (span_start = 0; span_start < key_len && s->str[i + span_start] == search_key[span_start]; span_start++);
-    if (span_start == key_len) {
-      span_start = i;
-      contains = 1;
-      break;
-    }
-  }
-
-  if (!contains) { // return if key is not present in s
-    return BAD;
-  }
-
   if (str_cmp(&(String){(char*)search_key, key_len, key_len}, &(String){(char*)target, target_len, target_len}) == 0) {
-    goto ret; // no need of replacement if key and value are same. just return.
+    return OK; // no need of replacement if key and value are same. just return.
+  }
+  int64_t span_start = str_contains(s, start, search_key, key_len);
+  if (span_start == BAD) { // return if key is not present in s
+    return BAD;
   }
 
   uint32_t span_end = span_start + key_len - 1;
@@ -510,37 +506,77 @@ int str_replace_first(String* s, int start, const char* search_key, uint32_t key
   } else if (diff < 0) { // target string is longer than search_key
     diff *= -1;
     if (s->length + diff > s->capacity) {
-
-      int64_t offset = str_rewind(s);
-      char* tmp = realloc(s->str, sizeof(char) * (s->capacity + diff) + 1);
-      if (tmp == NULL) {
-        printf("%s(): malloc failure.\n", __FUNCTION__);
-        return HALT;
-      }
-      s->str = tmp;
-      str_offset(s, offset);
-
-      s->capacity += diff;
+      int8_t ret = str_scale(s, 1.0 + _STR_SCALE_FACTOR);
+      if (ret == BAD || ret == HALT) return ret;
       s->length += diff;
       for (int j = s->length - 1; j >= span_end; j--) {
         s->str[j + diff] = s->str[j];
       } 
     }
   }
-
   for (int i = span_start, j = 0; j < target_len; i++, j++) {
     s->str[i] = target[j];
   }
-
-  ret:
-    return span_start + target_len - 1;
+  return span_start + target_len - 1;
 }
 
 // Replaces all occurrences of `key` with `replace_with`.
-int8_t str_replace_all(String* s, const char* search_key, uint32_t key_length, const char* replace_with, uint32_t val_length) {
-  int pos = 0;
-  while ((pos = str_replace_first(s, pos, search_key, key_length, replace_with, val_length)) != BAD);
-  return pos;
+int8_t str_replace_all(String* s, const char* search_key, uint32_t key_len, const char* target, uint32_t target_len) {
+  if (!s->mutable) {
+    printf("%s(): Cannot modify a slice\n", __FUNCTION__);
+    return BAD;
+  }
+
+  if (str_cmp(&(String){(char*)search_key, key_len, key_len}, &(String){(char*)target, target_len, target_len}) == 0) {
+    return OK; // no need of replacement if key and value are same. just return.
+  }
+
+  int64_t select_start = str_contains(s, 0, search_key, key_len);
+  int select_end = 0;
+  int diff = target_len - key_len;
+  while (select_start != BAD) {
+    select_end = select_start + key_len - 1;
+    if (diff > 0) {
+      if (s->capacity - s->length <= diff) {
+        int8_t ret = str_scale(s, _STR_SCALE_FACTOR);
+        if (ret == BAD || ret == HALT) return ret;
+      }
+      s->length += diff;
+      for (uint64_t j = s->length - 1; j >= select_end; j--) {
+        s->str[j + diff] = s->str[j]; // right shift
+      } 
+    } else if (diff < 0) {
+      diff *= -1;
+      s->length -= diff;
+      for (int j = select_end - diff + 1; j < s->length; j++) {
+        s->str[j] = s->str[j + diff]; // shift characters to left
+      }
+      diff *= -1;
+    }
+    for (int i = select_start, j = 0; j < target_len; i++, j++) {
+      s->str[i] = target[j];
+    }
+    select_start = str_contains(s, select_start + target_len, search_key, key_len);
+  }
+  return OK;
+}
+
+int8_t str_to_upper(String* s) {
+  for (uint64_t i = 0; i <  s->length; i++) {
+    if (s->str[i] >= 'a' && s->str[i] <= 'z') {
+      s->str[i] = 'A' +  s->str[i] - 'a';
+    }
+  }  
+  return OK;
+}
+
+int8_t str_to_lower(String* s) {
+  for (uint64_t i = 0; i <  s->length; i++) {
+    if (s->str[i] >= 'A' && s->str[i] <= 'Z') {
+      s->str[i] = 'a' +  s->str[i] - 'A';
+    }
+  }  
+  return OK;
 }
 
 // Returns a null-terminated C string. The caller is responsible for freeing the returned pointer using `free()`.
@@ -568,8 +604,8 @@ void str_free(String* s) {
 
 // shorthand of str_replace_all() using String types.
 #define sstr_replace_all(str_ptr, key_str, target_str) \
-  str_replace_all(str_ptr, key_str.str, key_str.length, target_str.str, target_str.length)
+  str_replace_all(str_ptr, (key_str)->str, (key_str)->length, (target_str)->str, (target_str)->length)
 
 // shorthand of str_contains() using String types.
-#define sstr_contains(src_str, key_str) \
-  (str_contains(src_str, (key_str)->str, (key_str)->length))
+#define sstr_contains(src_str, start, key_str) \
+  (str_contains(src_str, start, (key_str)->str, (key_str)->length))
