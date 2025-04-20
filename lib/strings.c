@@ -307,10 +307,10 @@ int8_t str_concat(String *dest, const String* src) {
   if (!dest->mutable) {
     RETURN_ERR(str_err_buf, BAD, "%s(): Can't modify a slice", __FUNCTION__); 
   }
-  dest->capacity += src->capacity;
+  dest->capacity += src->length;
 
   int64_t offset = str_rewind(dest);
-  char* tmp  = realloc(dest->str, sizeof(char) * dest->length);
+  char* tmp  = realloc(dest->str, sizeof(char) * dest->capacity);
   if(tmp == NULL) {
     RETURN_ERR(str_err_buf, HALT, "%s(): malloc failed.", __FUNCTION__);
   }
@@ -333,7 +333,7 @@ int8_t str_copy(String *dest, const String* src) {
     dest->capacity += src->length - dest->capacity;
 
     int64_t offset = str_rewind(dest);
-    char* tmp = realloc(dest->str, dest->length);
+    char* tmp = realloc(dest->str, dest->capacity);
     if (tmp == NULL) {
       RETURN_ERR(str_err_buf, HALT, "%s(): realloc() failed.", __FUNCTION__);
     }

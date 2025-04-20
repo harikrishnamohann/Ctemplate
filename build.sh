@@ -1,5 +1,7 @@
 #! /usr/bin/env bash
 
+LIBS=() # Specify the required libraries here
+
 # selecting compiler
 echo -n "Compiler: "
 echo -en "\e[32m"
@@ -22,8 +24,6 @@ CFLAGS="-std=c23 -Wall -Werror"
 RELEASE="target/release"
 DEBUG="target/debug"
 
-
-LIBS=() # Specify the required libraries here
 for lib in ${LIBS[@]}
 do
   echo -n "$lib library: " 

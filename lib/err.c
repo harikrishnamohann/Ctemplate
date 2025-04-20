@@ -4,11 +4,15 @@
 
 char err_buf[ERR_BUF_SIZE];
 
-typedef enum {
-    OK = 0,
-    BAD = -1,
-    HALT = -2,
-} Status;
+#ifndef OK
+#define OK 0
+#endif
+#ifndef BAD
+#define BAD -1
+#endif
+#ifndef HALT
+#define HALT -2
+#endif
 
 #define RETURN_OK(buf, val) do {*buf = '\0'; return val;} while(0)
 #define RETURN_ERR(buf, val, fmt, ...) do { snprintf(buf, ERR_BUF_SIZE, fmt, __VA_ARGS__); return val; } while (0)
