@@ -19,7 +19,7 @@ Ctemplate/
 │   ├── arena.c        # Arena memory allocator
 │   ├── err.c          # Error handling macros
 │   └── strings.c      # String type and manipulation functions
-├── makefile           # Compiles the project into the /target directory
+├── build.sh           # Compiles the project into the /target directory
 ├── README.md          # This file
 ├── src/               # Your project files go here
 │   └── main.c
@@ -58,19 +58,34 @@ To use any library from `lib/`, just include it in your `main.c` (or any other C
 
 int main() {
     String s = str_init("hello world");
+    str_debug_print(s);
+    str_free(&s);
     return 0;
 }
 ```
-
-Each library has a **"How to use"** or **API manual** section at the top of the file. Refer to it for a quick overview of available functions and usage examples.
 
 ---
 
 ## 📌 Notes
 
-- This template assumes a **unity build** — all source files are directly included in your entry point (e.g., `main.c`).
-- Memory management is manual. Libraries like `strings.c` and `arena.c` allocate memory that **you must free**.
-- You’re encouraged to extend or modify the template as per your needs.
+- I am using a **unity build system** for managing multiple files.
+- External libraries can be specified in LIBS array in build.sh as it'll ensure the existance of those libraries before compiling.
+
+#### Compiling:
+```bash
+./build.sh debug
+# or
+./build.sh release
+```
+
+#### compiling and running :
+```bash
+./build.sh debug run
+# or
+./build.sh release run
+# or
+./target/debug
+```
 
 ---
 
