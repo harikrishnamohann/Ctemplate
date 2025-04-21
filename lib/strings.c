@@ -110,7 +110,7 @@ uint64_t _ceil(double x) {
 // Returns OK on success, BAD if the string is a non-mutable slice, HALT on memory allocation failure.
 int8_t str_scale(String* s, float scale_factor) {
   if (!s->mutable)
-    return_bad(str_err, BAD, "%s(): can't modify a slice", __FUNCTION__);
+    return_halt(str_err, HALT, "%s(): Illegal action. Can't modify a slice", __FUNCTION__);
 
   int64_t offset = str_rewind(s);
   char* tmp = realloc(s->str, _ceil((float)s->capacity * scale_factor));
@@ -310,7 +310,7 @@ String str_join(const String *a, const String *b) {
 // Returns OK on success, BAD if `dest` is a non-mutable slice, HALT on memory allocation failure.
 int8_t str_concat(String *dest, const String* src) {
   if (!dest->mutable) {
-    return_bad(str_err, BAD, "%s(): Can't modify a slice", __FUNCTION__); 
+    return_halt(str_err, BAD, "%s(): Illegal action: Can't modify a slice", __FUNCTION__); 
   }
   dest->capacity += src->length;
 
@@ -332,7 +332,7 @@ int8_t str_concat(String *dest, const String* src) {
 // Returns OK on success, BAD if `dest` is a non-mutable slice, HALT on memory allocation failure.
 int8_t str_copy(String *dest, const String* src) {
   if (!dest->mutable) {
-    return_bad(str_err, BAD, "%s(): Can't modify a slice", __FUNCTION__); 
+    return_halt(str_err, BAD, "%s(): Illegal action. Can't modify a slice", __FUNCTION__); 
   }
   if (dest->capacity < src->length) {
     dest->capacity += src->length - dest->capacity;
@@ -421,7 +421,7 @@ static void _print_invalid_number_err_msg(const String* s, int i) {
 // Returns the converted integer on success, BAD if the input string is not a valid integer.
 int64_t str_to_int64(const String* s) {
   if (s->length == 0) {
-    return_bad(str_err, BAD, "%s(): string is empty", __FUNCTION__);
+    return_halt(str_err, HALT, "%s(): string is empty", __FUNCTION__);
   }
   int8_t sign = 1;
   int i = 0;
@@ -439,7 +439,7 @@ int64_t str_to_int64(const String* s) {
   }
   if (i != s->length){
     _print_invalid_number_err_msg(s, i);
-    return_bad(str_err, BAD, "%s(): error converting to integer: invalid character found", __FUNCTION__);
+    return_halt(str_err, HALT, "%s(): error converting to integer: invalid character found", __FUNCTION__);
   }
   return_ok(str_err, result * sign);
 }
@@ -448,7 +448,7 @@ int64_t str_to_int64(const String* s) {
 // Returns the converted double on success, BAD on failure (e.g., invalid input).
 double str_to_double(const String* s) {
   if (s->length == 0) {
-    return_bad(str_err, BAD, "%s(): string is empty", __FUNCTION__);
+    return_halt(str_err, HALT, "%s(): string is empty", __FUNCTION__);
   }
   double result = 0.0;
   int8_t sign = 1;
@@ -477,7 +477,7 @@ double str_to_double(const String* s) {
 
   if (i != s->length || (s->length == 1 && *s->str == '.')) {
     _print_invalid_number_err_msg(s, i);
-    return_bad(str_err, BAD, "%s(): error converting to double: invalid character found", __FUNCTION__);
+    return_halt(str_err, HALT, "%s(): error converting to double: invalid character found", __FUNCTION__);
   }
   return_ok(str_err, result * sign);
 }
@@ -488,7 +488,7 @@ double str_to_double(const String* s) {
 // or if the key is not found, HALT on memory allocation failure.
 int str_replace_first(String* s, int start, const char* search_key, uint32_t key_len, const char* target, uint32_t target_len) {
   if (!s->mutable) {
-    return_bad(str_err, BAD, "%s(): Cannot modify a slice", __FUNCTION__);
+    return_halt(str_err, HALT, "%s(): Illegal action. Cannot modify a slice", __FUNCTION__);
   }
   if (start < 0 || start >= s->length) {
     return_bad(str_err, BAD, "%s(): invalid start index", __FUNCTION__);    
@@ -529,7 +529,7 @@ int str_replace_first(String* s, int start, const char* search_key, uint32_t key
 // Replaces all occurrences of `key` with `replace_with`.
 int8_t str_replace_all(String* s, const char* search_key, uint32_t key_len, const char* target, uint32_t target_len) {
   if (!s->mutable) {
-    return_bad(str_err, BAD, "%s(): Cannot modify a slice", __FUNCTION__);
+    return_halt(str_err, HALT, "%s(): Illegal action. Cannot modify a slice", __FUNCTION__);
   }
 
   if (str_cmp(&(String){(char*)search_key, key_len, key_len}, &(String){(char*)target, target_len, target_len}) == 0) {
