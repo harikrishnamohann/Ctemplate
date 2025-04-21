@@ -44,7 +44,7 @@
 #include <stdbool.h>
 
 #include "err.c"
-char str_err_buf[ERR_BUF_SIZE];
+_Thread_local char str_err[ERR_BUF_SIZE];
 
 
 #define STR_DYNAMIC 0
@@ -67,31 +67,31 @@ const float _STR_SCALE_FACTOR = 2.0; // internal scale factor for resizing
 uint64_t str_len(const char* str) {
   uint64_t len = 0;
   while (str[len] != '\0') len++;
-  return_ok(str_err_buf, len);
+  return_ok(str_err, len);
 }
 
 // Moves the internal pointer of the string by the specified relative offset.
 // Returns OK on success, BAD on invalid offset.
 int8_t str_offset(String* s, int64_t offset) {
-  if (offset == 0) return_ok(str_err_buf, OK);
+  if (offset == 0) return_ok(str_err, OK);
   if (offset > (signed)s->length || offset * -1 > (signed)s->offset) {
-    return_err(str_err_buf, BAD, "%s(): invalid offset position", __FUNCTION__);
+    return_err(str_err, BAD, "%s(): invalid offset position", __FUNCTION__);
   }
   s->length -= offset;
   s->offset += offset;
   s->str += offset;
-  return_ok(str_err_buf, OK);
+  return_ok(str_err, OK);
 }
 
 // Rewinds the internal pointer of an offset string back to the beginning (offset 0).
 // Returns the original offset on success, OK if the offset was already 0.
 int64_t str_rewind(String* s) {
-  if (s->offset == 0) return_ok(str_err_buf, OK);
+  if (s->offset == 0) return_ok(str_err, OK);
   int64_t current_offset = s->offset;
   s->length += current_offset;
   s->str -= current_offset;
   s->offset = 0;
-  return_ok(str_err_buf, current_offset);
+  return_ok(str_err, current_offset);
 }
 
 uint64_t _ceil(double x) {
@@ -104,23 +104,23 @@ uint64_t _ceil(double x) {
 // Returns OK on success, BAD if the string is a non-mutable slice, HALT on memory allocation failure.
 int8_t str_scale(String* s, float scale_factor) {
   if (!s->mutable)
-    return_err(str_err_buf, BAD, "%s(): can't modify a slice", __FUNCTION__);
+    return_err(str_err, BAD, "%s(): can't modify a slice", __FUNCTION__);
 
   int64_t offset = str_rewind(s);
   char* tmp = realloc(s->str, _ceil((float)s->capacity * scale_factor));
   if (tmp == NULL) {
-    return_err(str_err_buf, HALT, "%s(): Failed to scale string!", __FUNCTION__);
+    return_err(str_err, HALT, "%s(): Failed to scale string!", __FUNCTION__);
   }
   s->str = tmp;
   str_offset(s, offset);
 
   s->capacity *= scale_factor;
-  return_ok(str_err_buf, OK);
+  return_ok(str_err, OK);
 }
 
 // Prints detailed debug information about a String object. This is primarily for internal debugging.
 void _str_debug_print(const char* var, const String* s) {
-  err_debug_print(str_err_buf);
+  err_debug_print(str_err);
   printf("%s::{ capacity:%lu, length:%lu, offset:%lu, mutable:%s, str:%p };\n", 
          var, s->capacity, s->length, s->offset, (s->mutable) ?"yes":"no", s->str);
   if (s->str == NULL) return;
@@ -146,7 +146,7 @@ void _str_debug_print(const char* var, const String* s) {
 // Returns STR_EMPTY on failure.
 String str_declare(int64_t capacity) {
   if (capacity < 0) {
-    return_err(str_err_buf, STR_EMPTY, "%s(): capacity shouldn't be negative value", __FUNCTION__);
+    return_err(str_err, STR_EMPTY, "%s(): capacity shouldn't be negative value", __FUNCTION__);
   }
   String s;
   s.length = 0;
@@ -158,9 +158,9 @@ String str_declare(int64_t capacity) {
   s.capacity = capacity;
   s.str = (char*)malloc(sizeof(char) * capacity);
   if (s.str == NULL) {
-    return_err(str_err_buf, STR_EMPTY, "%s(): malloc() failed", __FUNCTION__);
+    return_err(str_err, STR_EMPTY, "%s(): malloc() failed", __FUNCTION__);
   }
-  return_ok(str_err_buf, s);
+  return_ok(str_err, s);
 }
 
 // Initializes a String from a null-terminated C string.
@@ -168,11 +168,11 @@ String str_declare(int64_t capacity) {
 String str_init(const char* s) {
   String str = str_declare(str_len(s));
   if (str.str == STR_EMPTY.str) {
-    return_err(str_err_buf, STR_EMPTY, "%s(): failed to allocate memory for s", __FUNCTION__);    
+    return_err(str_err, STR_EMPTY, "%s(): failed to allocate memory for s", __FUNCTION__);    
   }
   str.length = str.capacity;
   for (int i = 0; i < str.length; i++) str.str[i] = s[i];
-  return_ok(str_err_buf, str);
+  return_ok(str_err, str);
 }
 
 // Inserts a character at the specified index (supports negative indexing).
@@ -184,13 +184,13 @@ String str_init(const char* s) {
     pos = s->length + pos + 1;
   }
   if (pos > s->length || pos < 0) { // check for invalid pos
-    return_err(str_err_buf, BAD, "%s(): invalid access position", __FUNCTION__);
+    return_err(str_err, BAD, "%s(): invalid access position", __FUNCTION__);
   }
   // deal with string capacity
   if (s->length == s->capacity) { // string is full
     int8_t ret = str_scale(s, _STR_SCALE_FACTOR);
     if (ret == BAD || ret == HALT) {
-      return_err(str_err_buf, ret, "%s(): failed to scale str", __FUNCTION__);
+      return_err(str_err, ret, "%s(): failed to scale str", __FUNCTION__);
     };
   }
   // assign ch to required pos
@@ -200,20 +200,20 @@ String str_init(const char* s) {
 
   s->str[pos] = ch;
   s->length++;
-  return_ok(str_err_buf, OK);
+  return_ok(str_err, OK);
 }
 
 // Removes and returns the character at the specified index (supports negative indexing).
 // Returns the removed character on success, BAD on error (empty string or invalid index).
 char str_remove(String* s, int64_t pos) {
   if (s->length <= 0) {
-    return_err(str_err_buf, BAD, "%s(): cannot perform remove from an empty string.", __FUNCTION__);
+    return_err(str_err, BAD, "%s(): cannot perform remove from an empty string.", __FUNCTION__);
   }
   if (pos < 0) { // normalize index
     pos = s->length + pos;
   }
   if (pos >= s->length || pos < 0) { // check for invalid pos
-    return_err(str_err_buf, BAD, "%s(): invalid access positon", __FUNCTION__);
+    return_err(str_err, BAD, "%s(): invalid access positon", __FUNCTION__);
   }
 
   char ch = s->str[pos];
@@ -221,7 +221,7 @@ char str_remove(String* s, int64_t pos) {
   for (int64_t i = pos; i < s->length; i++) {
     s->str[i] = s->str[i + 1];
   }
-  return_ok(str_err_buf, ch);
+  return_ok(str_err, ch);
 }
 
 // Returns a deep copy of the given string. The caller is responsible for freeing the memory.
@@ -229,18 +229,18 @@ char str_remove(String* s, int64_t pos) {
 String str_dup(const String* s) {
   String dup = str_declare(s->capacity);
   if (dup.str == STR_EMPTY.str) {
-    return_err(str_err_buf, STR_EMPTY, "%s(): failed to create duplicate", __FUNCTION__);
+    return_err(str_err, STR_EMPTY, "%s(): failed to create duplicate", __FUNCTION__);
   }
   dup.length = s->length;
   for (int i = 0; i < s->length; i++) dup.str[i] = s->str[i];
-  return_ok(str_err_buf, dup);
+  return_ok(str_err, dup);
 }
 
 // Returns a non-owning, non-mutable reference (view) into a substring of `str`.
 // No new memory is allocated. Returns STR_EMPTY on invalid slice parameters.
 String str_slice(const String* s, uint64_t start, uint64_t end) {
   if (end > s->length || start >= end) {
-    return_err(str_err_buf, STR_EMPTY, "%s(): incorrect slice length\nlength: %lu, start: %lu, end: %lu", __FUNCTION__, s->length, start, end);
+    return_err(str_err, STR_EMPTY, "%s(): incorrect slice length\nlength: %lu, start: %lu, end: %lu", __FUNCTION__, s->length, start, end);
   }
   String slice = {
     .length = end - start,
@@ -249,7 +249,7 @@ String str_slice(const String* s, uint64_t start, uint64_t end) {
     .mutable = false,
     .offset = s->offset + start,
   }; 
-  return_ok(str_err_buf, slice);
+  return_ok(str_err, slice);
 }
 
 // Returns a non-owning, non-mutable reference to a substring of `s`.
@@ -259,7 +259,7 @@ String str_slice(const String* s, uint64_t start, uint64_t end) {
 // Returns STR_EMPTY on invalid slice parameters.
 String str_slice_head(String* s, uint64_t start, uint64_t end) {
   if (end > s->length || start >= end) {
-    return_err(str_err_buf, STR_EMPTY, "%s(): incorrect slice length\nlength: %lu, start: %lu, end: %lu", __FUNCTION__, s->length, start, end);
+    return_err(str_err, STR_EMPTY, "%s(): incorrect slice length\nlength: %lu, start: %lu, end: %lu", __FUNCTION__, s->length, start, end);
   }
 
   String slice = {
@@ -279,9 +279,9 @@ String str_slice_head(String* s, uint64_t start, uint64_t end) {
   }
   
   if (str_offset(s, slice.length) == BAD) {
-    return_err(str_err_buf, STR_EMPTY, "%s(): failed to offset s", __FUNCTION__);
+    return_err(str_err, STR_EMPTY, "%s(): failed to offset s", __FUNCTION__);
   }
-  return_ok(str_err_buf, slice);
+  return_ok(str_err, slice);
 }
 
 // Returns a new string by concatenating `a` and `b`.
@@ -290,14 +290,14 @@ String str_slice_head(String* s, uint64_t start, uint64_t end) {
 String str_join(const String *a, const String *b) {
   String result = str_declare(a->capacity + b->capacity); 
   if (result.str == STR_EMPTY.str){
-    return_err(str_err_buf, STR_EMPTY, "%s(): malloc failed.", __FUNCTION__);
+    return_err(str_err, STR_EMPTY, "%s(): malloc failed.", __FUNCTION__);
   }
   
   result.length = a->length + b->length;
   int j = 0;
   for (int i = 0; i < a->length; i++, j++) result.str[j] = a->str[i];
   for (int i = 0; i < b->length; i++, j++) result.str[j] = b->str[i];
-  return_ok(str_err_buf, result);
+  return_ok(str_err, result);
 }
 
 // Appends the contents of `src` to the end of `dest`.
@@ -305,21 +305,21 @@ String str_join(const String *a, const String *b) {
 // Returns OK on success, BAD if `dest` is a non-mutable slice, HALT on memory allocation failure.
 int8_t str_concat(String *dest, const String* src) {
   if (!dest->mutable) {
-    return_err(str_err_buf, BAD, "%s(): Can't modify a slice", __FUNCTION__); 
+    return_err(str_err, BAD, "%s(): Can't modify a slice", __FUNCTION__); 
   }
   dest->capacity += src->length;
 
   int64_t offset = str_rewind(dest);
   char* tmp  = realloc(dest->str, sizeof(char) * dest->capacity);
   if(tmp == NULL) {
-    return_err(str_err_buf, HALT, "%s(): malloc failed.", __FUNCTION__);
+    return_err(str_err, HALT, "%s(): malloc failed.", __FUNCTION__);
   }
   dest->str = tmp;
   str_offset(dest, offset);
 
   for (int i = dest->length, j = 0; j < src->length; i++, j++) dest->str[i] = src->str[j];
   dest->length += src->length;
-  return_ok(str_err_buf, OK);
+  return_ok(str_err, OK);
 }
 
 // Replaces the contents of `dest` with the contents of `src`.
@@ -327,7 +327,7 @@ int8_t str_concat(String *dest, const String* src) {
 // Returns OK on success, BAD if `dest` is a non-mutable slice, HALT on memory allocation failure.
 int8_t str_copy(String *dest, const String* src) {
   if (!dest->mutable) {
-    return_err(str_err_buf, BAD, "%s(): Can't modify a slice", __FUNCTION__); 
+    return_err(str_err, BAD, "%s(): Can't modify a slice", __FUNCTION__); 
   }
   if (dest->capacity < src->length) {
     dest->capacity += src->length - dest->capacity;
@@ -335,7 +335,7 @@ int8_t str_copy(String *dest, const String* src) {
     int64_t offset = str_rewind(dest);
     char* tmp = realloc(dest->str, dest->capacity);
     if (tmp == NULL) {
-      return_err(str_err_buf, HALT, "%s(): realloc() failed.", __FUNCTION__);
+      return_err(str_err, HALT, "%s(): realloc() failed.", __FUNCTION__);
     }
     dest->str = tmp;
     str_offset(dest, offset);
@@ -345,7 +345,7 @@ int8_t str_copy(String *dest, const String* src) {
     dest->str[i] = src->str[i];
   }
   dest->length = src->length;
-  return_ok(str_err_buf, OK);
+  return_ok(str_err, OK);
 }
 
 // Performs a lexicographical comparison between `a` and `b`.
@@ -353,10 +353,10 @@ int8_t str_copy(String *dest, const String* src) {
 int32_t str_cmp(const String* a, const String* b) {
   for (int i = 0; i < a->length && i < b->length; i++) {
     if (a->str[i] != b->str[i]) {
-      return_ok(str_err_buf, a->str[i] - b->str[i]);
+      return_ok(str_err, a->str[i] - b->str[i]);
     }
   }
-  return_ok(str_err_buf, a->length - b->length);
+  return_ok(str_err, a->length - b->length);
 }
 
 // Returns a new formatted String, similar to `sprintf`.
@@ -369,12 +369,12 @@ String str_compose(const char* fmt, ...) {
     va_end(args);
 
     if (req_length < 0) {
-      return_err(str_err_buf, STR_EMPTY, "%s(): Error in format string", __FUNCTION__);
+      return_err(str_err, STR_EMPTY, "%s(): Error in format string", __FUNCTION__);
     }
 
     String composed = str_declare(req_length + 1);
     if (composed.str == STR_EMPTY.str){
-      return_err(str_err_buf, STR_EMPTY, "%s(): malloc failure.", __FUNCTION__);
+      return_err(str_err, STR_EMPTY, "%s(): malloc failure.", __FUNCTION__);
     }
 
     va_start(args, fmt);
@@ -382,7 +382,7 @@ String str_compose(const char* fmt, ...) {
     va_end(args);
 
     composed.length = req_length;
-    return_ok(str_err_buf, composed);
+    return_ok(str_err, composed);
 }
 
 // Returns the index of the first occurrence of `key` after `start` within
@@ -392,10 +392,10 @@ int64_t str_contains(const String* src, int64_t start, const char* key, uint64_t
   for (int i = start; i < src->length; i++) {
     for (pos = 0; pos < key_len && src->str[i + pos] == key[pos]; pos++);
     if (pos == key_len) {
-      return_ok(str_err_buf, i);
+      return_ok(str_err, i);
     }
   }
-  return_err(str_err_buf, BAD, "%s(): key not found", __FUNCTION__);
+  return_err(str_err, BAD, "%s(): key not found", __FUNCTION__);
 }
 
 // for printing debug information in number conversions.
@@ -416,7 +416,7 @@ static void _print_invalid_number_err_msg(const String* s, int i) {
 // Returns the converted integer on success, BAD if the input string is not a valid integer.
 int64_t str_to_int64(const String* s) {
   if (s->length == 0) {
-    return_err(str_err_buf, BAD, "%s(): string is empty", __FUNCTION__);
+    return_err(str_err, BAD, "%s(): string is empty", __FUNCTION__);
   }
   int8_t sign = 1;
   int i = 0;
@@ -434,16 +434,16 @@ int64_t str_to_int64(const String* s) {
   }
   if (i != s->length){
     _print_invalid_number_err_msg(s, i);
-    return_err(str_err_buf, BAD, "%s(): error converting to integer: invalid character found", __FUNCTION__);
+    return_err(str_err, BAD, "%s(): error converting to integer: invalid character found", __FUNCTION__);
   }
-  return_ok(str_err_buf, result * sign);
+  return_ok(str_err, result * sign);
 }
 
 // Converts the string `s` to a `double`.
 // Returns the converted double on success, BAD on failure (e.g., invalid input).
 double str_to_double(const String* s) {
   if (s->length == 0) {
-    return_err(str_err_buf, BAD, "%s(): string is empty", __FUNCTION__);
+    return_err(str_err, BAD, "%s(): string is empty", __FUNCTION__);
   }
   double result = 0.0;
   int8_t sign = 1;
@@ -470,11 +470,11 @@ double str_to_double(const String* s) {
     }
   }
 
-  if (i != s->length || s->length == 1 && *s->str == '.'){
+  if (i != s->length || (s->length == 1 && *s->str == '.')) {
     _print_invalid_number_err_msg(s, i);
-    return_err(str_err_buf, BAD, "%s(): error converting to double: invalid character found", __FUNCTION__);
+    return_err(str_err, BAD, "%s(): error converting to double: invalid character found", __FUNCTION__);
   }
-  return_ok(str_err_buf, result * sign);
+  return_ok(str_err, result * sign);
 }
 
 // Replaces the first occurrence of `key` within `str` (starting from `start`)
@@ -483,17 +483,17 @@ double str_to_double(const String* s) {
 // or if the key is not found, HALT on memory allocation failure.
 int str_replace_first(String* s, int start, const char* search_key, uint32_t key_len, const char* target, uint32_t target_len) {
   if (!s->mutable) {
-    return_err(str_err_buf, BAD, "%s(): Cannot modify a slice", __FUNCTION__);
+    return_err(str_err, BAD, "%s(): Cannot modify a slice", __FUNCTION__);
   }
   if (start < 0 || start >= s->length) {
-    return_err(str_err_buf, BAD, "%s(): invalid start index", __FUNCTION__);    
+    return_err(str_err, BAD, "%s(): invalid start index", __FUNCTION__);    
   }
   if (str_cmp(&(String){(char*)search_key, key_len, key_len}, &(String){(char*)target, target_len, target_len}) == 0) {
-    return_ok(str_err_buf, OK); // no need of replacement if key and value are same. just return.
+    return_ok(str_err, OK); // no need of replacement if key and value are same. just return.
   }
   int64_t span_start = str_contains(s, start, search_key, key_len);
   if (span_start == BAD) { // return if key is not present in s
-    return_err(str_err_buf, BAD, "%s(): key is not present in s", __FUNCTION__);
+    return_err(str_err, BAD, "%s(): key is not present in s", __FUNCTION__);
   }
 
   uint32_t span_end = span_start + key_len - 1;
@@ -507,7 +507,7 @@ int str_replace_first(String* s, int start, const char* search_key, uint32_t key
     diff *= -1;
     if (s->length + diff > s->capacity) {
       int8_t ret = str_scale(s, 1.0 + _STR_SCALE_FACTOR);
-      if (ret == BAD || ret == HALT) return_err(str_err_buf, ret, "%s(): malloc failure.", __FUNCTION__);
+      if (ret == BAD || ret == HALT) return_err(str_err, ret, "%s(): malloc failure.", __FUNCTION__);
       s->length += diff;
       for (int j = s->length - 1; j >= span_end; j--) {
         s->str[j + diff] = s->str[j];
@@ -517,17 +517,17 @@ int str_replace_first(String* s, int start, const char* search_key, uint32_t key
   for (int i = span_start, j = 0; j < target_len; i++, j++) {
     s->str[i] = target[j];
   }
-  return_ok(str_err_buf, span_start + target_len - 1);
+  return_ok(str_err, span_start + target_len - 1);
 }
 
 // Replaces all occurrences of `key` with `replace_with`.
 int8_t str_replace_all(String* s, const char* search_key, uint32_t key_len, const char* target, uint32_t target_len) {
   if (!s->mutable) {
-    return_err(str_err_buf, BAD, "%s(): Cannot modify a slice", __FUNCTION__);
+    return_err(str_err, BAD, "%s(): Cannot modify a slice", __FUNCTION__);
   }
 
   if (str_cmp(&(String){(char*)search_key, key_len, key_len}, &(String){(char*)target, target_len, target_len}) == 0) {
-    return_ok(str_err_buf, OK); // no need of replacement if key and value are same. just return.
+    return_ok(str_err, OK); // no need of replacement if key and value are same. just return.
   }
 
   int64_t select_start = str_contains(s, 0, search_key, key_len);
@@ -538,7 +538,7 @@ int8_t str_replace_all(String* s, const char* search_key, uint32_t key_len, cons
     if (diff > 0) {
       if (s->capacity - s->length <= diff) {
         int8_t ret = str_scale(s, _STR_SCALE_FACTOR);
-        if (ret == BAD || ret == HALT) return_err(str_err_buf, ret, "%s(): malloc failure.", __FUNCTION__);
+        if (ret == BAD || ret == HALT) return_err(str_err, ret, "%s(): malloc failure.", __FUNCTION__);
       }
       s->length += diff;
       for (uint64_t j = s->length - 1; j >= select_end; j--) {
@@ -557,7 +557,7 @@ int8_t str_replace_all(String* s, const char* search_key, uint32_t key_len, cons
     }
     select_start = str_contains(s, select_start + target_len, search_key, key_len);
   }
-  return_ok(str_err_buf, OK);
+  return_ok(str_err, OK);
 }
 
 int8_t str_to_upper(String* s) {
@@ -566,7 +566,7 @@ int8_t str_to_upper(String* s) {
       s->str[i] = 'A' +  s->str[i] - 'a';
     }
   }  
-  return_ok(str_err_buf, OK);
+  return_ok(str_err, OK);
 }
 
 int8_t str_to_lower(String* s) {
@@ -575,7 +575,7 @@ int8_t str_to_lower(String* s) {
       s->str[i] = 'a' +  s->str[i] - 'A';
     }
   }  
-  return_ok(str_err_buf, OK);
+  return_ok(str_err, OK);
 }
 
 // Returns a null-terminated C string. The caller is responsible for freeing the returned pointer using `free()`.
@@ -583,11 +583,11 @@ int8_t str_to_lower(String* s) {
 char*  str_to_cstring(const String* s) {
   char* cstring = malloc((sizeof(char) * s->length) + 1);
   if (cstring == NULL) {
-    return_err(str_err_buf, NULL, "%s(): malloc failure", __FUNCTION__);
+    return_err(str_err, NULL, "%s(): malloc failure", __FUNCTION__);
   } 
   for (size_t i = 0; i < s->length; i++) cstring[i] = s->str[i];
   cstring[s->length] = '\0';
-  return_ok(str_err_buf, cstring);
+  return_ok(str_err, cstring);
 }
 
 // Frees the memory allocated for the string and resets metadata.
