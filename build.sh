@@ -35,7 +35,7 @@ do
   CFLAGS+=" -l${lib}"
   echo -e "\e[32mfound\e[0m"
 done
-
+rm ./tmp
 
 ## creating required directories
 mkdir -p target
@@ -69,4 +69,3 @@ case $2 in
     ;;
 esac
 
-rm ./tmp
