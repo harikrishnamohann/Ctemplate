@@ -5,7 +5,7 @@
 
 - A simple `String` type implementation  
 - An `Arena` allocator  
-- Basic error handling mechanisms
+- Basic `error handling` mechanism
 
 This isn't an all-in-one C framework, but rather a personal toolkit that grows as needed.
 
@@ -18,7 +18,8 @@ Ctemplate/
 ├── lib/               # Home for second-level APIs (libraries)
 │   ├── arena.c        # Arena memory allocator
 │   ├── err.c          # Error handling macros
-│   └── strings.c      # String type and manipulation functions
+│   ├── strings.c      # String type and manipulation functions
+│   └── utils.c        # utility functions
 ├── build.sh           # Compiles the project into the /target directory
 ├── README.md          # This file
 ├── src/               # Your project files go here
