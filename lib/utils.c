@@ -13,12 +13,12 @@ bool is_alpha(char ch) { return ((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <=
 
 String file_to_str(char* filename) {
   if (access(filename, F_OK | R_OK) != 0) {
-    return_halt(utils_err, STR_EMPTY, "%s(): %s does not exist or not readable", __FUNCTION__, filename);
+    return_halt(utils_err, STR_EMPTY, "file does not exist or not readable");
   }
   FILE* fp = fopen(filename, "r");
   if (fp == NULL) {
     fclose(fp);
-    return_halt(utils_err, STR_EMPTY, "%s(): failed to open %s", __FUNCTION__, filename);
+    return_halt(utils_err, STR_EMPTY, "failed to open file");
   }
   String file = str_declare(STR_DYNAMIC);
   int ch;
@@ -33,12 +33,12 @@ int8_t str_to_file(char* filename, String content) {
   FILE* fp = fopen(filename, "w");
   if (fp == NULL) {
     fclose(fp);
-    return_halt(utils_err, HALT, "%s(): failed to open %s", __FUNCTION__, filename);
+    return_halt(utils_err, HALT, "failed to open file");
   }
   size_t bytes_written = fwrite(content.str, sizeof(char), content.length, fp);
   if (bytes_written != content.length) {
     fclose(fp);
-    return_bad(utils_err, BAD, "%s(): couldn't finish writing to %s", __FUNCTION__, filename);
+    return_bad(utils_err, BAD, "couldn't finish writing to file");
   }
   fclose(fp);
   return_ok(utils_err, OK);

@@ -46,25 +46,25 @@ _Thread_local signed char err_buf[ERR_BUF_SIZE];
                             } while(0)
 
 // writes BAD to *buf and update err_msg to buf + 1 and return val
-#define return_bad(buf, val, fmt, ...) do {\
+#define return_bad(buf, val, info) do {\
                                          *buf = BAD; \
-                                         snprintf((char*)buf + 1, ERR_BUF_SIZE - 1, fmt, __VA_ARGS__);\
+                                         snprintf((char*)buf + 1, ERR_BUF_SIZE - 1, "%s(): \"%s\"", __FUNCTION__, info);\
                                          return val;\
                                        } while (0)
 
 // writes HALT to *buf and update err_msg to buf + 1 and return val
-#define return_halt(buf, val, fmt, ...) do {\
+#define return_halt(buf, val, info) do {\
                                          *buf = HALT; \
-                                         snprintf((char*)buf + 1, ERR_BUF_SIZE - 1, fmt, __VA_ARGS__);\
+                                         snprintf((char*)buf + 1, ERR_BUF_SIZE - 1, "%s(): \"%s\"", __FUNCTION__, info);\
                                          return val;\
                                        } while (0)
 
 //  Prints out the err buf in style.
 #define err_status(buf) do { \
                          if (*buf) { \
-                           printf("%s::{ \e[31m%s\e[0m } => \"%s\"\n", #buf, (*buf == BAD) ? "BAD" : "HALT", buf + 1); \
+                           printf("\n%s::{ \e[31m%s\e[0m } => \"%s\"\n", #buf, (*buf == BAD) ? "BAD" : "HALT", buf + 1); \
                          } else {\
-                           printf("%s::{ \e[32mOK\e[0m }\n", #buf); \
+                           printf("\n%s::{ \e[32mOK\e[0m }\n", #buf); \
                          } \
                        } while(0)
 
@@ -72,9 +72,9 @@ _Thread_local signed char err_buf[ERR_BUF_SIZE];
 #define err_expect(buf, call_associated_with_buf) call_associated_with_buf; \
                          do { \
                          if (*buf == HALT) { \
-                           printf("%s::{ \e[31mHALT\e[0m } => \"%s\"\nexit.\n", #call_associated_with_buf, buf + 1); \
+                           printf("\n%s::{ \e[31mHALT\e[0m } => %s\nexit\t", #call_associated_with_buf, buf + 1); \
                            exit(EXIT_FAILURE); \
                          } else if (*buf == BAD) { \
-                           printf("%s::{ \e[31mBAD\e[0m } => \"%s\"\n", #call_associated_with_buf, buf + 1); \
+                           printf("\n%s::{ \e[31mBAD\e[0m } => %s\t", #call_associated_with_buf, buf + 1); \
                          } \
                        } while(0)
